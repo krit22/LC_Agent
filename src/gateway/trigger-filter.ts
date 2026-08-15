@@ -20,25 +20,54 @@ export function isGroupChat(jid: string): boolean {
 }
 
 /**
- * Check if a message comes from an allowed group.
- *
- * Invariants:
- * 1. Direct Messages (DMs) / 1-on-1 chats are STRICTLY BLOCKED to protect privacy.
- * 2. Only WhatsApp Groups (ending in @g.us) are eligible.
- * 3. If ALLOWED_GROUP_JIDS is configured, the group must also be in that allowlist.
+ * Checks if a message is from the user's "Chat with self" / "Message yourself" conversation.
  */
-export function isAllowedGroup(groupJid: string): boolean {
-  // Strict block for non-group chats (DMs, broadcasts, etc.)
-  if (!isGroupChat(groupJid)) {
+export function isSelfChat(
+  remoteJid: string,
+  fromMe: boolean,
+  myUserJid?: string,
+): boolean {
+  if (!fromMe) return false
+  if (!myUserJid) return false
+
+  const cleanMyJid = myUserJid.split('@')[0].split(':')[0]
+  const cleanRemoteJid = remoteJid.split('@')[0].split(':')[0]
+
+  return cleanMyJid === cleanRemoteJid
+}
+
+/**
+ * Check if a message comes from an eligible channel.
+ *
+ * Allowed channels:
+ * 1. Any WhatsApp Group (ending in @g.us) that matches ALLOWED_GROUP_JIDS (if configured).
+ * 2. Personal "Chat with self" (Message yourself) for bot administration & private commands.
+ *
+ * Blocked channels:
+ * 1. 1-on-1 Direct Messages (DMs) with other contacts (to protect personal privacy).
+ * 2. Broadcasts (status@broadcast).
+ */
+export function isAllowedChannel(
+  remoteJid: string,
+  fromMe: boolean,
+  myUserJid?: string,
+): boolean {
+  // Allow "Chat with self"
+  if (isSelfChat(remoteJid, fromMe, myUserJid)) {
+    return true
+  }
+
+  // If not self-chat, it MUST be a group chat
+  if (!isGroupChat(remoteJid)) {
     return false
   }
 
-  // If no specific group JIDs are restricted in config, all group chats are allowed
+  // If specific group JIDs are allowlisted, verify membership
   if (config.allowedGroupJids.length === 0) {
     return true
   }
 
-  return config.allowedGroupJids.includes(groupJid)
+  return config.allowedGroupJids.includes(remoteJid)
 }
 
 /**

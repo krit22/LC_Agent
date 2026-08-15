@@ -1,6 +1,6 @@
 # Workflow: WhatsApp Ingestion
 
-This document details the end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering out Direct Messages (DMs), validating with the trigger keyword, and dispatching events to the Agent Brain.
+This document details the end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering channels (allowing groups and Chat with Self while blocking external DMs), validating with the trigger keyword, and dispatching events to the Agent Brain.
 
 ---
 
@@ -15,8 +15,8 @@ This document details the end-to-end flow for connecting to WhatsApp, receiving 
            │
            │ messages.upsert (type === 'notify')
            ▼
-[ Layer 2: DM Isolation ] ───── Is remoteJid a Group Chat (ends with '@g.us')?
-           │                    NO → silently ignore (DMs strictly blocked)
+[ Layer 2: Channel Filter ] ─── Is it a Group Chat (@g.us) OR Chat with Self?
+           │                    NO → silently ignore (external DMs blocked)
            │                    YES ↓
            ▼
 [ Layer 2: Group Whitelist ] ── Is remoteJid in ALLOWED_GROUP_JIDS?
@@ -56,9 +56,11 @@ This document details the end-to-end flow for connecting to WhatsApp, receiving 
 - On subsequent boots, the session resumes silently.
 - Disconnections trigger auto-reconnect unless `DisconnectReason.loggedOut`.
 
-### Step 2: DM Blocking, Group Whitelist & Trigger Filtering
-- **Strict DM Block**: The system checks if `msg.key.remoteJid` ends with `@g.us`. All 1-on-1 direct messages and broadcast channels are immediately ignored to protect personal chat privacy.
-- The system checks `msg.key.remoteJid` against `ALLOWED_GROUP_JIDS` from config.
+### Step 2: Channel Eligibility & Trigger Filtering
+- **Channel Verification**:
+  1. **Groups**: Any chat ending with `@g.us` (checked against `ALLOWED_GROUP_JIDS` if configured).
+  2. **Chat with Self**: Messages sent to one's own account ("Message yourself") for private bot administration.
+  3. **External DMs**: 1-on-1 chats with other contacts are strictly blocked to protect privacy.
 - Only real-time deliveries (`type === 'notify'`) are processed; backfills (`type === 'append'`) are skipped.
 - Text is extracted from `conversation`, `extendedTextMessage.text`, or `imageMessage.caption`.
 - **Trigger gate**: If the text does not start with the trigger keyword (`lc `), the message is logged to `message_audit_logs` with `intent_detected = 'IGNORED'` and no further action is taken.
@@ -69,7 +71,7 @@ This document details the end-to-end flow for connecting to WhatsApp, receiving 
 - New messages are inserted with `processed = false`.
 
 ### Step 4: Context & Agent Processing
-- The cleaned message is appended to the group's short-term conversation context (sliding window, 15 messages, 30-min TTL).
+- The cleaned message is appended to the group/chat short-term conversation context (sliding window, 15 messages, 30-min TTL).
 - The agent reacts with ⏳ and sets presence to `composing`.
 - The Agent Brain receives the message + conversation history and reasons via `generateText()` with registered tools.
 

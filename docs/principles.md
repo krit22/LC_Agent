@@ -9,12 +9,12 @@ These stable principles govern all product decisions, code designs, and schema m
 - Use **Vercel AI SDK** for LLM integration — a single `generateText()` call with typed tools, not heavyweight agent frameworks.
 - Avoid introducing heavy dependencies when simple, standard Node.js / TypeScript libraries suffice.
 
-## 2. Group-Only Operation & DM Isolation
-- **Strict Privacy Isolation**: The agent operates **exclusively** inside WhatsApp Group chats (`@g.us`).
-- All 1-on-1 Direct Messages (DMs, `@s.whatsapp.net`) and status broadcasts (`status@broadcast`) are blocked and discarded at the gateway level. The bot will never process commands or access personal messages in DMs.
+## 2. Channel Scope & Privacy Isolation
+- **Supported Channels**: The agent operates in **WhatsApp Group chats** (`@g.us`) and in the admin's personal **"Chat with self"** ("Message yourself").
+- **External DM Isolation**: 1-on-1 Direct Messages with other contacts (`@s.whatsapp.net`) and status broadcasts (`status@broadcast`) are strictly blocked and discarded at the gateway level to protect personal chat privacy.
 
 ## 3. Trigger-Gated Activation
-- The backend receives messages from WhatsApp groups but only activates the agent brain when a message starts with the configured trigger keyword (`lc `).
+- The backend receives messages from permitted channels but only activates the agent brain when a message starts with the configured trigger keyword (`lc `).
 - Non-triggered messages are logged silently and discarded. This prevents unnecessary LLM calls and keeps costs predictable.
 
 ## 4. Event-Driven & Idempotent
