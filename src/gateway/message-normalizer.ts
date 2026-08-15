@@ -1,4 +1,4 @@
-import type { WAMessage } from '@whiskeysockets/baileys'
+import type { WAMessage, WASocket } from '@whiskeysockets/baileys'
 
 /**
  * Normalized message payload extracted from a raw WAMessage.
@@ -6,7 +6,7 @@ import type { WAMessage } from '@whiskeysockets/baileys'
 export interface NormalizedMessage {
   /** Raw WhatsApp message ID */
   messageId: string
-  /** Group JID the message came from */
+  /** Group or chat JID the message came from */
   groupJid: string
   /** Sender JID (participant in group, or remoteJid for 1:1) */
   senderJid: string
@@ -16,6 +16,8 @@ export interface NormalizedMessage {
   text: string
   /** JIDs mentioned in the message */
   mentions: string[]
+  /** Whether the message was sent by the authenticated user */
+  fromMe: boolean
   /** The original WAMessage for quoting replies */
   rawMessage: WAMessage
 }
@@ -24,11 +26,26 @@ export interface NormalizedMessage {
  * Extract a clean text body and metadata from a raw Baileys WAMessage.
  * Returns null if no usable text content is found.
  */
-export function normalizeMessage(msg: WAMessage): NormalizedMessage | null {
+export function normalizeMessage(
+  msg: WAMessage,
+  sock?: WASocket,
+): NormalizedMessage | null {
   const messageId = msg.key.id
   const groupJid = msg.key.remoteJid
-  const senderJid = msg.key.participant || msg.key.remoteJid
-  const senderName = msg.pushName || 'Unknown'
+  const fromMe = Boolean(msg.key.fromMe)
+
+  // Determine sender JID
+  let senderJid = msg.key.participant || msg.key.remoteJid || ''
+  if (fromMe && sock?.user?.id) {
+    // Format user JID cleanly (strip device suffix like :1)
+    senderJid = sock.user.id.replace(/:\d+@/, '@')
+  }
+
+  // Determine sender display name
+  let senderName = msg.pushName
+  if (!senderName) {
+    senderName = fromMe ? 'You' : 'Unknown'
+  }
 
   if (!messageId || !groupJid || !senderJid) return null
 
@@ -58,6 +75,7 @@ export function normalizeMessage(msg: WAMessage): NormalizedMessage | null {
     senderName,
     text: text.trim(),
     mentions: [...mentions],
+    fromMe,
     rawMessage: msg,
   }
 }

@@ -31,19 +31,17 @@ export function registerListeners(sock: WASocket): void {
  * Process a single incoming WhatsApp message through the full pipeline.
  */
 async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
-  // Skip messages sent by us
-  if (msg.key.fromMe) return
-
-  // Step 1: Normalize the raw message
-  const normalized = normalizeMessage(msg)
+  // Step 1: Normalize the raw message (passes sock to resolve self JID/name)
+  const normalized = normalizeMessage(msg, sock)
   if (!normalized) return
 
   const isGroup = normalized.groupJid.endsWith('@g.us')
   const chatType = isGroup ? 'Group' : 'Direct Chat'
+  const senderTag = normalized.fromMe ? `${normalized.senderName} [Self / Admin]` : normalized.senderName
 
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
   console.log(`📨 [WhatsApp Ingested]`)
-  console.log(`   From:    ${normalized.senderName} (${normalized.senderJid})`)
+  console.log(`   From:    ${senderTag} (${normalized.senderJid})`)
   console.log(`   Chat:    ${normalized.groupJid} [${chatType}]`)
   console.log(`   Content: "${normalized.text}"`)
 
