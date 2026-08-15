@@ -47,10 +47,14 @@ This document describes the high-level architecture, subsystem boundaries, data 
 │  LAYER 4 — Agent Brain (LLM + Tool Calling)                     │
 │  src/agent/brain.ts + tools/*.ts + prompts.ts                    │
 │  • Vercel AI SDK generateText() with OpenRouter provider         │
-│  • 7 Prisma-backed tools: listTasks, getTask, createTask,        │
-│    updateTask, listPeople, getPerson, listDomains                │
-│  • Multi-step reasoning (maxSteps: 5)                            │
-│  • Hard boundary: NO schema changes, NO deletes                  │
+│  • 14 Specialized Tools:                                         │
+│    - Tasks: listTasks, getTask, createTask, updateTask           │
+│    - Members: listPeople, getPerson, createPerson, updatePerson │
+│    - Domains: listDomains, createDomain, updateDomain            │
+│    - WhatsApp Live: listWhatsAppGroups, getWhatsAppGroupMembers, │
+│      syncGroupMembersToDb                                        │
+│    - Safe Schema: executeDatabaseQuery (with 2-step confirmation)│
+│  • Multi-step reasoning (stopWhen: isStepCount(5))               │
 │  Output: responseText + tool execution results                   │
 └────────────────────────────────┬─────────────────────────────────┘
                                  │ response

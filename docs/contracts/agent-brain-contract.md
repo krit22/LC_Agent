@@ -1,61 +1,79 @@
 # Contract: AI Agent Brain Engine
 
-This contract defines the LLM integration, tool definitions, system prompt rules, and reasoning boundaries of the AI Agent Brain.
+This contract defines the LLM integration, tool definitions, system prompt rules, reasoning boundaries, and safety guardrails of the AI Agent Brain.
 
 ---
 
 ## 1. Framework & Provider
 
-- **AI SDK**: Vercel AI SDK (`ai` package) — provides `generateText()` with multi-step tool calling.
+- **AI SDK**: Vercel AI SDK (`ai` package) — provides `generateText()` with multi-step tool calling (`stopWhen: isStepCount(5)`).
 - **LLM Provider**: OpenRouter (`@openrouter/ai-sdk-provider`) — routes to 300+ models via single API key.
-- **Default Model**: Configurable via `OPENROUTER_MODEL` env var (e.g. `google/gemini-2.5-flash`).
-- **Schema Validation**: `zod` — all tool parameters and outputs are Zod-typed.
+- **Default Model**: Configurable via `OPENROUTER_MODEL` env var (e.g. `deepseek/deepseek-v4-flash`, `google/gemini-2.5-flash`).
+- **Schema Validation**: `zod` — all tool parameters and outputs are Zod-typed with `inputSchema`.
 
 ---
 
 ## 2. Primary Invariants
 
-1. **No Schema Mutations**: The agent has zero ability to ALTER TABLE, add columns, drop tables, or modify the Prisma schema. No tools exist for DDL operations.
-2. **No Destructive Deletes**: The agent cannot DELETE people or tasks. Tasks can only be transitioned to `CANCELLED` or `COMPLETED` status.
-3. **Schema Validation**: All tool inputs are validated via Zod schemas before executing Prisma operations. Invalid inputs return descriptive errors to the LLM for self-correction.
-4. **Graceful Fallbacks**: If the LLM returns unparseable output or tool execution fails, the system logs the error to `message_audit_logs` with `intent_detected = 'PARSE_ERROR'` and replies with a user-friendly error message.
-5. **Deterministic Entity Resolution**: When linking a task to a person, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
-6. **Bounded Authority**: The agent must acknowledge when a request is outside its capabilities and explicitly tell the user it cannot do that.
+1. **Two-Step Schema Confirmation**: Raw SQL and DDL mutations (`executeDatabaseQuery`) require a strict two-step verification protocol. The agent must explain the proposed change, generate a confirmation token, and require human confirmation before execution.
+2. **No Unbounded Deletes**: The agent cannot indiscriminately delete club members or tasks. Tasks are moved to `CANCELLED` or `COMPLETED`.
+3. **Live WhatsApp Socket Access**: The agent has read-only reflection into the live Baileys client (`listWhatsAppGroups`, `getWhatsAppGroupMembers`) and can sync participants into the database (`syncGroupMembersToDb`).
+4. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
+5. **Schema Validation**: All tool inputs are validated via Zod schemas before executing Prisma operations.
 
 ---
 
 ## 3. Tool Registry
 
-| Tool | Zod Parameters | Prisma Operation | Returns |
+### A. Task & Workflow Tools (`src/agent/tools/task-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
-| `listTasks` | `{ personName?, domainCode?, status?, priority? }` | `prisma.task.findMany({ where, include })` | Task[] with assignee & domain |
-| `getTask` | `{ taskId?, titleSearch? }` | `prisma.task.findFirst({ where, include })` | Single task detail |
-| `createTask` | `{ task, description?, assigneeName?, domainCode?, workflowType?, priority?, dueDate? }` | `prisma.task.create({ data })` | Created task record |
-| `updateTask` | `{ taskId, status?, priority?, feedback?, assigneeName?, description? }` | `prisma.task.update({ where, data })` | Updated task record |
-| `listPeople` | `{ name?, year?, domainCode? }` | `prisma.person.findMany({ where, include })` | Person[] with domains |
-| `getPerson` | `{ name?, phoneJid? }` | `prisma.person.findFirst({ where, include })` | Full person with tasks & domains |
-| `listDomains` | `{}` | `prisma.domain.findMany({ include: { _count } })` | Domain[] with member counts |
+| `listTasks` | `{ personName?, domainCode?, status?, priority? }` | `prisma.task.findMany()` | Task[] with assignee & domain |
+| `getTask` | `{ taskId?, titleSearch? }` | `prisma.task.findFirst()` | Single task detail |
+| `createTask` | `{ task, description?, assigneeName?, domainCode?, workflowType?, priority?, dueDate? }` | `prisma.task.create()` | Created task record |
+| `updateTask` | `{ taskId, status?, priority?, feedback?, assigneeName?, description? }` | `prisma.task.update()` | Updated task record |
+
+### B. Member & Domain Directory Tools (`src/agent/tools/people-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
+| :--- | :--- | :--- | :--- |
+| `listPeople` | `{ name?, year?, domainCode? }` | `prisma.person.findMany()` | Person[] with domains |
+| `getPerson` | `{ name?, phoneJid? }` | `prisma.person.findFirst()` | Full person profile + tasks |
+| `createPerson` | `{ name, year, phoneJid?, role?, domainCodes? }` | `prisma.person.create()` + join table | Created member record |
+| `updatePerson` | `{ personId?, nameSearch?, year?, role?, phoneJid?, domainCodes? }` | `prisma.person.update()` | Updated member record |
+| `listDomains` | `{}` | `prisma.domain.findMany()` | Domain[] with member counts |
+| `createDomain` | `{ name, code, description? }` | `prisma.domain.create()` | Created domain record |
+| `updateDomain` | `{ domainCode, name?, description? }` | `prisma.domain.update()` | Updated domain record |
+
+### C. Live WhatsApp Inspection Tools (`src/agent/tools/whatsapp-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
+| :--- | :--- | :--- | :--- |
+| `listWhatsAppGroups` | `{ searchName? }` | `sock.groupFetchAllParticipating()` | Group[] with JID, subject, member count |
+| `getWhatsAppGroupMembers` | `{ groupJid?, groupName? }` | `sock.groupMetadata()` | Roster with phone numbers, JIDs, roles |
+| `syncGroupMembersToDb` | `{ groupJid?, groupName?, defaultYear?, domainCodes? }` | `sock.groupMetadata()` + `prisma.person.upsert()` | Sync summary & member list |
+
+### D. Safe Schema Evolution Tool (`src/agent/tools/schema-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
+| :--- | :--- | :--- | :--- |
+| `executeDatabaseQuery` | `{ sql, reason, confirmationToken }` | `prisma.$executeRawUnsafe()` / `$queryRawUnsafe()` | Affected rows / query dataset |
 
 ---
 
 ## 4. System Prompt Contract
 
-The system prompt (`src/agent/prompts.ts`) must define:
-
-1. **Identity**: "You are the LC Agent, the task management assistant for The Literary Circle Club."
-2. **Capabilities**: Create tasks, update task statuses, query people and assignments, list domains.
-3. **Hard boundaries**: Cannot modify schema, cannot delete records, cannot act outside task management.
-4. **Response style**: Concise, bullet points for lists, confirm actions with specific details.
-5. **Schema awareness**: Injected summary of valid domains, workflow types (`GENERAL`, `POSTER`), statuses, and priority levels.
+The system prompt (`src/agent/prompts.ts`) defines:
+1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
+2. **WhatsApp Awareness**: Inspects live groups and member rosters on demand.
+3. **Chat-Driven Seeding**: Direct member/domain creation and updates from chat prompts.
+4. **Mandatory Double-Confirmation**: For `executeDatabaseQuery`, must issue token, request confirmation, and verify response before execution.
+5. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
 
 ---
 
 ## 5. Conversation Context Rules
 
 - Short-term memory via in-memory sliding window (15 messages, 30-min TTL).
-- Context is per-group, not per-user.
-- Only triggered messages (prefixed with `lc`) and their agent responses enter the context.
-- Context is NOT persisted — resets on server restart.
+- Context is per-group, including message metadata (`[Chat: <groupJid>] [SenderName]: <command>`).
+- Context is reset on server restart (no persistent leakage).
 
 ---
 
@@ -63,19 +81,11 @@ The system prompt (`src/agent/prompts.ts`) must define:
 
 | File | Responsibility |
 | :--- | :--- |
-| `src/agent/brain.ts` | Core orchestrator: `generateText()` with tools, system prompt, and conversation history |
-| `src/agent/tools/index.ts` | Tool registry exporting all tools |
-| `src/agent/tools/task-tools.ts` | `listTasks`, `getTask`, `createTask`, `updateTask` |
-| `src/agent/tools/people-tools.ts` | `listPeople`, `getPerson`, `listDomains` |
-| `src/agent/context.ts` | In-memory conversation context manager |
-| `src/agent/prompts.ts` | System prompt definition with schema awareness |
-| `src/config.ts` | Centralized env config (trigger keyword, group JIDs, model, context settings) |
-
----
-
-## 7. Validation & Testing
-
-- Unit tests must feed sample WhatsApp messages through the tool pipeline and assert correct Prisma operations.
-- Tool parameter validation must reject invalid statuses, unknown domain codes, and malformed UUIDs.
-- Fuzz tests with empty strings, emoji-only messages, or oversized inputs must not cause crashes.
-- The agent must correctly respond "I can't do that" for schema change requests, delete requests, and out-of-scope queries.
+| `src/agent/brain.ts` | Core orchestrator: `generateText()` with all registered tools and real-time step logging |
+| `src/agent/tools/index.ts` | Tool registry exporting all 14 tools |
+| `src/agent/tools/task-tools.ts` | Task CRUD & workflow transitions |
+| `src/agent/tools/people-tools.ts` | Member & domain management |
+| `src/agent/tools/whatsapp-tools.ts` | Live WhatsApp socket querying and member syncing |
+| `src/agent/tools/schema-tools.ts` | Guarded raw SQL and DDL schema execution |
+| `src/agent/context.ts` | Sliding-window conversation context manager |
+| `src/agent/prompts.ts` | System prompt with schema awareness and confirmation rules |

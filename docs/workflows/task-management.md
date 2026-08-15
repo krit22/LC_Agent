@@ -1,6 +1,6 @@
 # Workflow: Task Management & Predefined Workflows
 
-This document describes how the AI Agent Brain parses, creates, and transitions tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle).
+This document describes how the AI Agent Brain parses, creates, and transitions tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle), as well as administering members and domains.
 
 ---
 
@@ -75,41 +75,50 @@ When a reviewer requests revisions on a poster or task:
 
 ## 4. Agent Conversational Examples
 
-The agent is activated by the `lc` trigger prefix in monitored WhatsApp groups. Here are representative interactions:
+The agent is activated by the `lc ` trigger prefix in WhatsApp chats.
 
-### Creating a Task
+### A. WhatsApp Group Discovery & Seeding
 ```text
-User:  lc create a poster task for the upcoming hackathon, assign to Rahul under graphic design, high priority
+User:  lc list all groups you are in
+Agent: 📋 Active WhatsApp Groups:
+       1. The Literary Circle Core (18 members) — JID: 120363123456@g.us
+       2. LC Design & Web Team (9 members) — JID: 120363987654@g.us
+
+User:  lc import all members from the Core group and assign them to 2nd year
+Agent: ✅ Synced 18 members from "The Literary Circle Core" into the database (Year: 2).
+```
+
+### B. Chat-Driven Member Administration
+```text
+User:  lc add Rahul Sharma, 3rd year, domains: web_dev, graphic_design, role: Lead
+Agent: ✅ Added Rahul Sharma (Year 3, Lead) linked to Web Development & Graphic Designing.
+
+User:  lc change Rahul's role to President
+Agent: ✅ Updated Rahul Sharma's role to President.
+```
+
+### C. Task Creation & Workflow Progression
+```text
+User:  lc create a poster task for the Annual Hackathon, assign to Rahul, high priority
 Agent: ✅ Task created:
-       • Title: Poster for upcoming hackathon
-       • Assignee: Rahul
+       • Title: Poster for Annual Hackathon
+       • Assignee: Rahul Sharma
        • Domain: Graphic Designing
-       • Workflow: POSTER (stage: SEARCHING_TEMPLATES)
-       • Priority: high
+       • Stage: SEARCHING_TEMPLATES | Priority: high
+
+User:  lc update the hackathon poster task to EDITING
+Agent: ✅ Updated "Poster for Annual Hackathon" status → EDITING.
 ```
 
-### Querying Tasks
+### D. Safe Schema Evolution (Two-Step Confirmation)
 ```text
-User:  lc what tasks is Rahul assigned to?
-Agent: Rahul has 3 active tasks:
-       1. Poster for upcoming hackathon (SEARCHING_TEMPLATES, high)
-       2. Build club website (ONGOING, medium)
-       3. Write blog post for newsletter (ASSIGNED, low)
-```
+User:  lc add a new column 'github_handle' to people table
+Agent: ⚠️ Database Schema Modification Proposed:
+       ```sql
+       ALTER TABLE people ADD COLUMN github_handle VARCHAR(100);
+       ```
+       To execute this change, please reply with: `lc confirm SQL-8192`
 
-### Follow-up with Context
-```text
-User:  lc update the first one to EDITING status
-Agent: ✅ Updated "Poster for upcoming hackathon" → EDITING
-```
-
-The agent resolves "the first one" from short-term conversation context (sliding window of 15 messages, 30-min TTL).
-
-### Agent Acknowledging Limitations
-```text
-User:  lc delete all tasks for Rahul
-Agent: ❌ I can't delete tasks. I can move them to CANCELLED status instead. Would you like me to cancel Rahul's tasks?
-
-User:  lc add a new column for task urgency score
-Agent: ❌ I can't modify the database schema. Schema changes need to be made by a developer through Prisma migrations.
+User:  lc confirm SQL-8192
+Agent: ✅ SQL query executed successfully. Added column 'github_handle' to table 'people'.
 ```

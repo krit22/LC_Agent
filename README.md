@@ -43,10 +43,11 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │   ├── brain.ts           # LLM reasoning via generateText() + tools
 │   │   ├── context.ts         # In-memory sliding-window conversation store
 │   │   ├── prompts.ts         # System prompt & agent identity
-│   │   └── tools/
 │   │       ├── index.ts       # Tool registry
 │   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask
-│   │       └── people-tools.ts  # listPeople, getPerson, listDomains
+│   │       ├── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
+│   │       ├── whatsapp-tools.ts # listWhatsAppGroups, getWhatsAppGroupMembers, syncGroupMembersToDb
+│   │       └── schema-tools.ts # executeDatabaseQuery (with two-step confirmation)
 │   ├── services/
 │   │   └── whatsapp/
 │   │       ├── client.ts      # Baileys socket lifecycle + reconnection

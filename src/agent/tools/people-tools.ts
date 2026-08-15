@@ -39,6 +39,7 @@ export const listPeople = tool({
       name: p.name,
       year: p.year,
       role: p.role,
+      phoneJid: p.phoneJid,
       domains: p.domains.map((d: any) => d.domain.name),
     }))
   },
@@ -101,6 +102,174 @@ export const getPerson = tool({
   },
 })
 
+export const createPerson = tool({
+  description:
+    'Add a new club member to the database and link them to their academic year and domains.',
+  inputSchema: z.object({
+    name: z.string().describe('Full name of the club member.'),
+    year: z
+      .number()
+      .min(1)
+      .max(4)
+      .describe('Academic year of the member (1, 2, 3, or 4).'),
+    phoneJid: z
+      .string()
+      .optional()
+      .describe('Optional WhatsApp JID (e.g. 919876543210@s.whatsapp.net).'),
+    role: z
+      .string()
+      .default('member')
+      .describe('Club role (e.g. Lead, Coordinator, Core Member, member). Default is "member".'),
+    domainCodes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Array of domain codes this member belongs to (e.g. ["web_dev", "graphic_design"]).',
+      ),
+  }),
+  execute: async ({ name, year, phoneJid, role, domainCodes }) => {
+    try {
+      const created = await prisma.person.create({
+        data: {
+          name,
+          year,
+          phoneJid: phoneJid || null,
+          role: role || 'member',
+        },
+      })
+
+      const linkedDomains = []
+      if (domainCodes && domainCodes.length > 0) {
+        const matchingDomains = await prisma.domain.findMany({
+          where: { code: { in: domainCodes } },
+        })
+        for (const dom of matchingDomains) {
+          await prisma.personDomain.create({
+            data: {
+              personId: created.id,
+              domainId: dom.id,
+            },
+          })
+          linkedDomains.push(dom.name)
+        }
+      }
+
+      return {
+        id: created.id,
+        name: created.name,
+        year: created.year,
+        role: created.role,
+        phoneJid: created.phoneJid,
+        domains: linkedDomains,
+        message: `Member ${created.name} successfully created and assigned to ${linkedDomains.join(', ') || 'no domains'}.`,
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      return { error: `Failed to create member: ${msg}` }
+    }
+  },
+})
+
+export const updatePerson = tool({
+  description:
+    'Update an existing member details, academic year, role, or reassign their domains.',
+  inputSchema: z.object({
+    personId: z.string().uuid().optional().describe('UUID of the person to update.'),
+    nameSearch: z
+      .string()
+      .optional()
+      .describe('Case-insensitive search to identify the person by name if personId is not provided.'),
+    name: z.string().optional().describe('New updated full name.'),
+    year: z
+      .number()
+      .min(1)
+      .max(4)
+      .optional()
+      .describe('New academic year (1, 2, 3, 4).'),
+    role: z.string().optional().describe('New club role.'),
+    phoneJid: z.string().optional().describe('New phone JID.'),
+    domainCodes: z
+      .array(z.string())
+      .optional()
+      .describe(
+        'Replaces the member domains with this new list of domain codes (e.g. ["web_dev", "video_editing"]).',
+      ),
+  }),
+  execute: async ({
+    personId,
+    nameSearch,
+    name,
+    year,
+    role,
+    phoneJid,
+    domainCodes,
+  }) => {
+    try {
+      let targetPerson
+      if (personId) {
+        targetPerson = await prisma.person.findUnique({ where: { id: personId } })
+      } else if (nameSearch) {
+        targetPerson = await prisma.person.findFirst({
+          where: { name: { contains: nameSearch, mode: 'insensitive' } },
+        })
+      }
+
+      if (!targetPerson) {
+        return { error: 'Member not found with the provided identifier.' }
+      }
+
+      const dataToUpdate: any = {}
+      if (name !== undefined) dataToUpdate.name = name
+      if (year !== undefined) dataToUpdate.year = year
+      if (role !== undefined) dataToUpdate.role = role
+      if (phoneJid !== undefined) dataToUpdate.phoneJid = phoneJid
+
+      const updated = await prisma.person.update({
+        where: { id: targetPerson.id },
+        data: dataToUpdate,
+      })
+
+      if (domainCodes !== undefined) {
+        // Reset existing domains and link new ones
+        await prisma.personDomain.deleteMany({
+          where: { personId: targetPerson.id },
+        })
+        if (domainCodes.length > 0) {
+          const matchingDomains = await prisma.domain.findMany({
+            where: { code: { in: domainCodes } },
+          })
+          for (const dom of matchingDomains) {
+            await prisma.personDomain.create({
+              data: {
+                personId: targetPerson.id,
+                domainId: dom.id,
+              },
+            })
+          }
+        }
+      }
+
+      const finalPerson = await prisma.person.findUnique({
+        where: { id: targetPerson.id },
+        include: { domains: { include: { domain: true } } },
+      })
+
+      return {
+        id: finalPerson!.id,
+        name: finalPerson!.name,
+        year: finalPerson!.year,
+        role: finalPerson!.role,
+        phoneJid: finalPerson!.phoneJid,
+        domains: finalPerson!.domains.map((d: any) => d.domain.name),
+        message: `Member ${finalPerson!.name} successfully updated.`,
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      return { error: `Failed to update member: ${msg}` }
+    }
+  },
+})
+
 export const listDomains = tool({
   description: 'List all domains with member counts.',
   inputSchema: z.object({}),
@@ -120,5 +289,72 @@ export const listDomains = tool({
       description: d.description,
       memberCount: d._count.members,
     }))
+  },
+})
+
+export const createDomain = tool({
+  description: 'Add a new club domain to the database.',
+  inputSchema: z.object({
+    name: z.string().describe('Full human-readable domain name (e.g. "Photography & Media").'),
+    code: z.string().describe('Short programmatic domain code (e.g. "photography").'),
+    description: z.string().optional().describe('Description of the domain scope.'),
+  }),
+  execute: async ({ name, code, description }) => {
+    try {
+      const created = await prisma.domain.create({
+        data: {
+          name,
+          code: code.toLowerCase().trim(),
+          description: description || null,
+        },
+      })
+      return {
+        id: created.id,
+        name: created.name,
+        code: created.code,
+        description: created.description,
+        message: `Domain "${created.name}" (${created.code}) created successfully.`,
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      return { error: `Failed to create domain: ${msg}` }
+    }
+  },
+})
+
+export const updateDomain = tool({
+  description: 'Update an existing domain name or description.',
+  inputSchema: z.object({
+    domainCode: z.string().describe('The code of the domain to update (e.g. "web_dev").'),
+    name: z.string().optional().describe('New domain name.'),
+    description: z.string().optional().describe('New domain description.'),
+  }),
+  execute: async ({ domainCode, name, description }) => {
+    try {
+      const existing = await prisma.domain.findUnique({
+        where: { code: domainCode },
+      })
+      if (!existing) return { error: `Domain with code "${domainCode}" not found.` }
+
+      const dataToUpdate: any = {}
+      if (name !== undefined) dataToUpdate.name = name
+      if (description !== undefined) dataToUpdate.description = description
+
+      const updated = await prisma.domain.update({
+        where: { code: domainCode },
+        data: dataToUpdate,
+      })
+
+      return {
+        id: updated.id,
+        name: updated.name,
+        code: updated.code,
+        description: updated.description,
+        message: `Domain "${updated.name}" updated successfully.`,
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      return { error: `Failed to update domain: ${msg}` }
+    }
   },
 })

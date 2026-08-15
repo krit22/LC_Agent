@@ -10,7 +10,15 @@ import {
   updateTask,
   listPeople,
   getPerson,
+  createPerson,
+  updatePerson,
   listDomains,
+  createDomain,
+  updateDomain,
+  listWhatsAppGroups,
+  getWhatsAppGroupMembers,
+  syncGroupMembersToDb,
+  executeDatabaseQuery,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -31,8 +39,8 @@ export interface BrainResult {
  * Process a user command through the AI Agent Brain.
  *
  * 1. Retrieves conversation history for the group
- * 2. Adds the new user message to context
- * 3. Calls generateText() with tools and system prompt
+ * 2. Adds the new user message to context with sender & group metadata
+ * 3. Calls generateText() with all tools and system prompt
  * 4. Adds the assistant response to context
  * 5. Returns the response text
  */
@@ -42,8 +50,10 @@ export async function processCommand(
   senderName: string,
 ): Promise<BrainResult> {
   try {
-    // Build message with sender context
-    const userMessage = `[${senderName}]: ${commandText}`
+    // Build message with sender and active group context
+    const isGroup = groupJid.endsWith('@g.us')
+    const chatContext = isGroup ? `[Chat: ${groupJid}]` : '[Chat: Direct Message]'
+    const userMessage = `${chatContext} [${senderName}]: ${commandText}`
 
     // Add to conversation context
     conversationContext.addUserMessage(groupJid, userMessage)
@@ -56,7 +66,7 @@ export async function processCommand(
     console.log(`   Context: ${messages.length} message(s) in group memory`)
     console.log(`   Prompt:  "${userMessage}"`)
 
-    // Call the LLM with tools
+    // Call the LLM with full tool suite
     const result = await generateText({
       model: openrouter(config.openrouterModel),
       system: SYSTEM_PROMPT,
@@ -68,7 +78,15 @@ export async function processCommand(
         updateTask,
         listPeople,
         getPerson,
+        createPerson,
+        updatePerson,
         listDomains,
+        createDomain,
+        updateDomain,
+        listWhatsAppGroups,
+        getWhatsAppGroupMembers,
+        syncGroupMembersToDb,
+        executeDatabaseQuery,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {
@@ -83,8 +101,8 @@ export async function processCommand(
           for (const tr of step.toolResults) {
             const summary =
               typeof tr.output === 'object'
-                ? JSON.stringify(tr.output).slice(0, 200) +
-                  (JSON.stringify(tr.output).length > 200 ? '...' : '')
+                ? JSON.stringify(tr.output).slice(0, 250) +
+                  (JSON.stringify(tr.output).length > 250 ? '...' : '')
                 : String(tr.output)
             console.log(`   📊 [Tool Output] ${tr.toolName} → ${summary}`)
           }
