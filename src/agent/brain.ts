@@ -51,6 +51,11 @@ export async function processCommand(
     // Get full conversation history
     const messages = conversationContext.getHistory(groupJid)
 
+    console.log(`\n🧠 [Agent Brain] Initiating reasoning`)
+    console.log(`   Model:   ${config.openrouterModel}`)
+    console.log(`   Context: ${messages.length} message(s) in group memory`)
+    console.log(`   Prompt:  "${userMessage}"`)
+
     // Call the LLM with tools
     const result = await generateText({
       model: openrouter(config.openrouterModel),
@@ -66,10 +71,32 @@ export async function processCommand(
         listDomains,
       },
       stopWhen: isStepCount(5),
+      onStepFinish: (step) => {
+        if (step.toolCalls && step.toolCalls.length > 0) {
+          for (const tc of step.toolCalls) {
+            console.log(
+              `   🔧 [Agent Tool Call] ${tc.toolName}(${JSON.stringify((tc as any).input || (tc as any).args || {})})`,
+            )
+          }
+        }
+        if (step.toolResults && step.toolResults.length > 0) {
+          for (const tr of step.toolResults) {
+            const summary =
+              typeof tr.output === 'object'
+                ? JSON.stringify(tr.output).slice(0, 200) +
+                  (JSON.stringify(tr.output).length > 200 ? '...' : '')
+                : String(tr.output)
+            console.log(`   📊 [Tool Output] ${tr.toolName} → ${summary}`)
+          }
+        }
+      },
     })
 
     const responseText =
       result.text || 'I processed the request but have no text to respond with.'
+
+    console.log(`\n💬 [Agent Response Generated]`)
+    console.log(`   ${responseText.split('\n').join('\n   ')}`)
 
     // Add assistant response to context
     conversationContext.addAssistantMessage(groupJid, responseText)
@@ -78,7 +105,7 @@ export async function processCommand(
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error'
-    console.error('[Agent Brain] Error processing command:', errorMessage)
+    console.error(`\n❌ [Agent Brain Error] ${errorMessage}`)
 
     return {
       responseText: `❌ Something went wrong while processing your request. Please try again.\n\nError: ${errorMessage}`,

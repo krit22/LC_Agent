@@ -38,16 +38,30 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   const normalized = normalizeMessage(msg)
   if (!normalized) return
 
+  const isGroup = normalized.groupJid.endsWith('@g.us')
+  const chatType = isGroup ? 'Group' : 'Direct Chat'
+
+  console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+  console.log(`📨 [WhatsApp Ingested]`)
+  console.log(`   From:    ${normalized.senderName} (${normalized.senderJid})`)
+  console.log(`   Chat:    ${normalized.groupJid} [${chatType}]`)
+  console.log(`   Content: "${normalized.text}"`)
+
   // Step 2: Check group whitelist
-  if (!isAllowedGroup(normalized.groupJid)) return
+  if (!isAllowedGroup(normalized.groupJid)) {
+    console.log(`   Action:  ⏭️ Ignored (Chat not in ALLOWED_GROUP_JIDS)`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    return
+  }
 
   // Step 3: Check trigger keyword
   const trigger = checkTrigger(normalized)
 
   if (!trigger.triggered) {
-    // Not triggered — log silently and return
-    // We do a non-blocking audit log insert for non-triggered messages
-    // but don't await it to avoid slowing down the socket
+    console.log(`   Action:  ⏭️ Ignored (No '${process.env.TRIGGER_KEYWORD || 'lc'} ' trigger prefix)`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+
+    // Save non-blocking audit log
     prisma.messageAuditLog
       .upsert({
         where: { messageId: normalized.messageId },
@@ -65,12 +79,15 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
     return
   }
 
+  console.log(`   Action:  🟢 TRIGGER ACTIVATED! Command: "${trigger.commandText}"`)
+
   // Step 4: Deduplication check
   const existing = await prisma.messageAuditLog.findUnique({
     where: { messageId: normalized.messageId },
   })
   if (existing) {
-    console.log(`[Listener] Duplicate message ${normalized.messageId}, skipping`)
+    console.log(`   Status:  ⚠️ Duplicate message ID (${normalized.messageId}), skipping`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
     return
   }
 
@@ -86,11 +103,8 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
     },
   })
 
-  console.log(
-    `[Listener] Triggered: "${trigger.commandText}" from ${normalized.senderName} in ${normalized.groupJid}`,
-  )
-
   // Step 6: Visual feedback — react ⏳ and show typing
+  console.log(`   Feedback: Reacting with ⏳ & setting presence to 'composing'...`)
   await reactToMessage(sock, normalized.groupJid, msg.key, '⏳')
   await setTyping(sock, normalized.groupJid)
 
@@ -117,6 +131,9 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
       msg.key,
       result.success ? '✅' : '❌',
     )
+
+    console.log(`\n📤 [WhatsApp Outgoing] Quoted reply sent back to ${normalized.groupJid} with reaction ${result.success ? '✅' : '❌'}`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
 
     // Step 9: Mark audit log as processed
     await prisma.messageAuditLog.update({
