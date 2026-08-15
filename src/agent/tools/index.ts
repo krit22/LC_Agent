@@ -1,4 +1,10 @@
-export { listTasks, getTask, createTask, updateTask } from './task-tools.js'
+export {
+  listTasks,
+  getTask,
+  createTask,
+  updateTask,
+  deleteCompletedTasks,
+} from './task-tools.js'
 export {
   listPeople,
   getPerson,

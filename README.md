@@ -44,7 +44,7 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │   ├── context.ts         # In-memory sliding-window conversation store
 │   │   ├── prompts.ts         # System prompt & agent identity
 │   │       ├── index.ts       # Tool registry
-│   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask
+│   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask, deleteCompletedTasks
 │   │       └── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
 │   ├── services/
 │   │   └── whatsapp/

@@ -17,9 +17,10 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 
 1. **Zero Technical/SQL Jargon in Outputs**: The agent must NEVER output raw SQL, table definitions, or database queries in user-facing WhatsApp messages. Responses must be concise, natural, and human-friendly.
 2. **Extreme Brevity**: All WhatsApp replies must be short, clear, and direct (1 to 4 lines maximum).
-3. **Structured High-Level Tools Only**: The agent operates exclusively through 10 typed Prisma tools. No raw SQL or DDL execution tools exist.
-4. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
-5. **Schema Validation**: All tool inputs are validated via Zod schemas before executing Prisma operations.
+3. **Completed Task Deletion Boundary**: The agent has the ability to delete tasks via `deleteCompletedTasks`, but **only** for tasks that have reached `status === 'COMPLETED'`. Ongoing/active tasks cannot be deleted.
+4. **Structured High-Level Tools Only**: The agent operates exclusively through 11 typed Prisma tools.
+5. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
+6. **Schema Validation**: All tool inputs are validated via Zod schemas before executing Prisma operations.
 
 ---
 
@@ -32,6 +33,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | `getTask` | `{ taskId?, titleSearch? }` | `prisma.task.findFirst()` | Single task detail |
 | `createTask` | `{ task, description?, assigneeName?, domainCode?, workflowType?, priority?, dueDate? }` | `prisma.task.create()` | Created task record |
 | `updateTask` | `{ taskId, status?, priority?, feedback?, assigneeName?, description? }` | `prisma.task.update()` | Updated task record |
+| `deleteCompletedTasks` | `{ taskId?, titleSearch?, deleteAll?, domainCode? }` | `prisma.task.delete()` / `deleteMany({ where: { status: 'COMPLETED' } })` | Deletion count / detail |
 
 ### B. Member & Domain Directory Tools (`src/agent/tools/people-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
@@ -51,7 +53,8 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 The system prompt (`src/agent/prompts.ts`) defines:
 1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
 2. **Response Style**: Ultra-short, compact bullet points, no pleasantries, zero technical/SQL jargon.
-3. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
+3. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
+4. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
 
 ---
 
@@ -68,8 +71,8 @@ The system prompt (`src/agent/prompts.ts`) defines:
 | File | Responsibility |
 | :--- | :--- |
 | `src/agent/brain.ts` | Core orchestrator: `generateText()` with database tools and real-time step logging |
-| `src/agent/tools/index.ts` | Tool registry exporting all 10 structured tools |
-| `src/agent/tools/task-tools.ts` | Task CRUD & workflow transitions |
+| `src/agent/tools/index.ts` | Tool registry exporting all 11 structured tools |
+| `src/agent/tools/task-tools.ts` | Task CRUD, workflow transitions, and completed task deletion |
 | `src/agent/tools/people-tools.ts` | Member & domain management |
 | `src/agent/context.ts` | Sliding-window conversation context manager |
-| `src/agent/prompts.ts` | System prompt enforcing extreme brevity and zero SQL outputs |
+| `src/agent/prompts.ts` | System prompt enforcing extreme brevity, zero SQL outputs, and deletion safety |

@@ -253,3 +253,85 @@ export const updateTask = tool({
     }
   },
 })
+
+export const deleteCompletedTasks = tool({
+  description:
+    'Permanently delete completed tasks from the database. Can delete a specific completed task or batch clear all tasks with status COMPLETED.',
+  inputSchema: z.object({
+    taskId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Specific UUID of the completed task to delete.'),
+    titleSearch: z
+      .string()
+      .optional()
+      .describe('Search task title to delete a specific completed task.'),
+    deleteAll: z
+      .boolean()
+      .default(false)
+      .describe('If true, deletes all tasks that have status COMPLETED.'),
+    domainCode: z
+      .string()
+      .optional()
+      .describe('Optional domain code filter when batch deleting completed tasks.'),
+  }),
+  execute: async ({ taskId, titleSearch, deleteAll, domainCode }) => {
+    try {
+      if (deleteAll) {
+        const where: any = { status: 'COMPLETED' }
+        if (domainCode) {
+          where.domain = { code: domainCode }
+        }
+
+        const deleteResult = await prisma.task.deleteMany({
+          where,
+        })
+
+        return {
+          deletedCount: deleteResult.count,
+          message: `Successfully deleted ${deleteResult.count} completed task(s).`,
+        }
+      }
+
+      if (!taskId && !titleSearch) {
+        return {
+          error:
+            'Please specify a taskId, titleSearch, or set deleteAll=true to delete completed tasks.',
+        }
+      }
+
+      const where: any = {}
+      if (taskId) where.id = taskId
+      if (titleSearch) where.task = { contains: titleSearch, mode: 'insensitive' }
+
+      const task = await prisma.task.findFirst({
+        where,
+        include: { domain: true },
+      })
+
+      if (!task) {
+        return { error: 'Task not found.' }
+      }
+
+      if (task.status !== 'COMPLETED') {
+        return {
+          error: `Cannot delete task "${task.task}" because its status is "${task.status}". Only tasks with status "COMPLETED" can be deleted.`,
+        }
+      }
+
+      await prisma.task.delete({
+        where: { id: task.id },
+      })
+
+      return {
+        deletedTaskId: task.id,
+        deletedTaskTitle: task.task,
+        message: `Successfully deleted completed task: "${task.task}".`,
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error'
+      return { error: `Failed to delete completed task(s): ${msg}` }
+    }
+  },
+})

@@ -1,6 +1,6 @@
 # Workflow: Task Management & Predefined Workflows
 
-This document describes how the AI Agent Brain parses, creates, and transitions tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle), as well as administering members and domains in the database.
+This document describes how the AI Agent Brain parses, creates, transitions, and clears tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle), as well as administering members and domains in the database.
 
 ---
 
@@ -106,4 +106,16 @@ Agent: Active Tasks:
 User:  lc list all members in Graphic Designing
 Agent: Graphic Designing:
        • Rahul Sharma (Year 3, President)
+```
+
+### D. Deleting Completed Tasks
+```text
+User:  lc delete the completed hackathon poster task
+Agent: ✅ Deleted completed task: "Poster for Annual Hackathon"
+
+User:  lc clear all completed tasks under Graphic Designing
+Agent: ✅ Cleared 3 completed task(s).
+
+User:  lc delete the ongoing website redesign task
+Agent: ❌ Only completed tasks can be deleted. Task is currently ONGOING.
 ```
