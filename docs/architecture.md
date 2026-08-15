@@ -47,11 +47,10 @@ This document describes the high-level architecture, subsystem boundaries, data 
 │  LAYER 4 — Agent Brain (LLM + Tool Calling)                     │
 │  src/agent/brain.ts + tools/*.ts + prompts.ts                    │
 │  • Vercel AI SDK generateText() with OpenRouter provider         │
-│  • 11 Prisma Database Tools:                                     │
+│  • 10 Prisma Database Tools:                                     │
 │    - Tasks: listTasks, getTask, createTask, updateTask           │
 │    - Members: listPeople, getPerson, createPerson, updatePerson │
 │    - Domains: listDomains, createDomain, updateDomain            │
-│    - Safe Schema: executeDatabaseQuery (with 2-step confirmation)│
 │  • Multi-step reasoning (stopWhen: isStepCount(5))               │
 │  Output: responseText + tool execution results                   │
 └────────────────────────────────┬─────────────────────────────────┘

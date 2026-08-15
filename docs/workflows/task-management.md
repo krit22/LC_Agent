@@ -75,50 +75,35 @@ When a reviewer requests revisions on a poster or task:
 
 ## 4. Agent Conversational Examples
 
-The agent is activated by the `lc ` trigger prefix in authorized WhatsApp chats.
+The agent is activated by the `lc ` trigger prefix in authorized WhatsApp chats. All outputs are ultra-short and concise:
 
-### A. Chat-Driven Member Administration
-```text
-User:  lc add Rahul Sharma, 3rd year, domains: web_dev, graphic_design, role: Lead
-Agent: ✅ Added Rahul Sharma (Year 3, Lead) linked to Web Development & Graphic Designing.
-
-User:  lc change Rahul's role to President
-Agent: ✅ Updated Rahul Sharma's role to President.
-```
-
-### B. Task Creation & Workflow Progression
+### A. Task Creation & Workflow Progression
 ```text
 User:  lc create a poster task for the Annual Hackathon, assign to Rahul, high priority
-Agent: ✅ Task created:
-       • Title: Poster for Annual Hackathon
-       • Assignee: Rahul Sharma
-       • Domain: Graphic Designing
-       • Stage: SEARCHING_TEMPLATES | Priority: high
+Agent: ✅ Created: "Poster for Annual Hackathon"
+       • Assignee: Rahul Sharma (Graphic Designing)
+       • Status: SEARCHING_TEMPLATES | Priority: high
 
 User:  lc update the hackathon poster task to EDITING
-Agent: ✅ Updated "Poster for Annual Hackathon" status → EDITING.
+Agent: ✅ Updated "Poster for Annual Hackathon" → EDITING
+```
+
+### B. Member Directory Administration
+```text
+User:  lc add Rahul Sharma, 3rd year, domains: web_dev, graphic_design, role: Lead
+Agent: ✅ Added Rahul Sharma (Year 3, Lead) — Domains: Web Development, Graphic Designing
+
+User:  lc change Rahul's role to President
+Agent: ✅ Updated Rahul Sharma's role to President
 ```
 
 ### C. Querying Tasks & Members
 ```text
 User:  lc what tasks are currently ongoing?
-Agent: Active tasks:
-       1. Poster for Annual Hackathon (Assignee: Rahul Sharma, Stage: EDITING, Priority: high)
+Agent: Active Tasks:
+       1. Poster for Annual Hackathon — Rahul Sharma (EDITING, high)
 
 User:  lc list all members in Graphic Designing
-Agent: Graphic Designing Members:
+Agent: Graphic Designing:
        • Rahul Sharma (Year 3, President)
-```
-
-### D. Safe Schema Evolution (Two-Step Confirmation)
-```text
-User:  lc add a new column 'github_handle' to people table
-Agent: ⚠️ Database Schema Modification Proposed:
-       ```sql
-       ALTER TABLE people ADD COLUMN github_handle VARCHAR(100);
-       ```
-       To execute this change, please reply with: `lc confirm SQL-8192`
-
-User:  lc confirm SQL-8192
-Agent: ✅ SQL query executed successfully. Added column 'github_handle' to table 'people'.
 ```

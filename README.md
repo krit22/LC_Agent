@@ -45,8 +45,7 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │   ├── prompts.ts         # System prompt & agent identity
 │   │       ├── index.ts       # Tool registry
 │   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask
-│   │       ├── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
-│   │       └── schema-tools.ts # executeDatabaseQuery (with two-step confirmation)
+│   │       └── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
 │   ├── services/
 │   │   └── whatsapp/
 │   │       ├── client.ts      # Baileys socket lifecycle + reconnection

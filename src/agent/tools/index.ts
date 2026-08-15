@@ -8,4 +8,3 @@ export {
   createDomain,
   updateDomain,
 } from './people-tools.js'
-export { executeDatabaseQuery } from './schema-tools.js'
