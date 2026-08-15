@@ -1,0 +1,64 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Domain {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  people Person[]
+
+  @@map("domains")
+}
+
+model Person {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(255)
+  phoneJid  String?  @unique @map("phone_jid") @db.VarChar(100)
+  domainId  String?  @map("domain_id") @db.Uuid
+  role      String   @default("member") @db.VarChar(100)
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  domain Domain? @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  tasks  Task[]
+
+  @@map("people")
+}
+
+model Task {
+  id              String    @id @default(uuid()) @db.Uuid
+  task            String    @db.Text
+  description     String?   @db.Text
+  assignedTo      String?   @map("assigned_to") @db.Uuid
+  status          String    @default("pending") @db.VarChar(50)
+  priority        String    @default("medium") @db.VarChar(20)
+  dueDate         DateTime? @map("due_date") @db.Timestamptz()
+  sourceMessageId String?   @map("source_message_id") @db.VarChar(255)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  assignee Person? @relation(fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@map("tasks")
+}
+
+model MessageAuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  messageId      String   @unique @map("message_id") @db.VarChar(255)
+  senderJid      String   @map("sender_jid") @db.VarChar(100)
+  groupJid       String   @map("group_jid") @db.VarChar(100)
+  messageText    String?  @map("message_text") @db.Text
+  intentDetected String?  @map("intent_detected") @db.VarChar(100)
+  processed      Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("message_audit_logs")
+}

@@ -2,6 +2,10 @@
 .env
 .env.local
 *.env
+auth_info_baileys/
+*.auth/
+tokens/
+
 
 # Python
 __pycache__/
@@ -37,6 +41,8 @@ pnpm-debug.log*
 .next/
 dist/
 out/
+prisma.config.js
+
 
 # IDE & Editors
 .vscode/

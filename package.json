@@ -1,0 +1,31 @@
+{
+  "name": "lc-agent",
+  "version": "0.1.0",
+  "description": "Backend service for The Literary Circle Club AI Agent",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@prisma/client": "^7.9.1",
+    "dotenv": "^17.4.2",
+    "hono": "^4.13.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "prisma": "^7.9.1",
+    "supabase": "^2.114.0",
+    "tsx": "^4.23.0",
+    "typescript": "^7.0.2"
+  }
+}
