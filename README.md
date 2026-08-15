@@ -46,7 +46,6 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │       ├── index.ts       # Tool registry
 │   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask
 │   │       ├── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
-│   │       ├── whatsapp-tools.ts # listWhatsAppGroups, getWhatsAppGroupMembers, syncGroupMembersToDb
 │   │       └── schema-tools.ts # executeDatabaseQuery (with two-step confirmation)
 │   ├── services/
 │   │   └── whatsapp/

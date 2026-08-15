@@ -15,9 +15,6 @@ import {
   listDomains,
   createDomain,
   updateDomain,
-  listWhatsAppGroups,
-  getWhatsAppGroupMembers,
-  syncGroupMembersToDb,
   executeDatabaseQuery,
 } from './tools/index.js'
 
@@ -40,7 +37,7 @@ export interface BrainResult {
  *
  * 1. Retrieves conversation history for the group
  * 2. Adds the new user message to context with sender & group metadata
- * 3. Calls generateText() with all tools and system prompt
+ * 3. Calls generateText() with database tools and system prompt
  * 4. Adds the assistant response to context
  * 5. Returns the response text
  */
@@ -63,10 +60,10 @@ export async function processCommand(
 
     console.log(`\n🧠 [Agent Brain] Initiating reasoning`)
     console.log(`   Model:   ${config.openrouterModel}`)
-    console.log(`   Context: ${messages.length} message(s) in group memory`)
+    console.log(`   Context: ${messages.length} message(s) in memory`)
     console.log(`   Prompt:  "${userMessage}"`)
 
-    // Call the LLM with full tool suite
+    // Call the LLM with database tools only
     const result = await generateText({
       model: openrouter(config.openrouterModel),
       system: SYSTEM_PROMPT,
@@ -83,9 +80,6 @@ export async function processCommand(
         listDomains,
         createDomain,
         updateDomain,
-        listWhatsAppGroups,
-        getWhatsAppGroupMembers,
-        syncGroupMembersToDb,
         executeDatabaseQuery,
       },
       stopWhen: isStepCount(5),

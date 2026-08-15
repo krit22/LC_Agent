@@ -16,8 +16,8 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 ## 2. Primary Invariants
 
 1. **Two-Step Schema Confirmation**: Raw SQL and DDL mutations (`executeDatabaseQuery`) require a strict two-step verification protocol. The agent must explain the proposed change, generate a confirmation token, and require human confirmation before execution.
-2. **No Unbounded Deletes**: The agent cannot indiscriminately delete club members or tasks. Tasks are moved to `CANCELLED` or `COMPLETED`.
-3. **Live WhatsApp Socket Access**: The agent has read-only reflection into the live Baileys client (`listWhatsAppGroups`, `getWhatsAppGroupMembers`) and can sync participants into the database (`syncGroupMembersToDb`).
+2. **Zero WhatsApp Introspection**: The agent has ZERO direct access or tools to query the WhatsApp socket, list user groups, or inspect WhatsApp contact lists. The agent interacts exclusively with the PostgreSQL database.
+3. **No Unbounded Deletes**: The agent cannot indiscriminately delete club members or tasks. Tasks are moved to `CANCELLED` or `COMPLETED`.
 4. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
 5. **Schema Validation**: All tool inputs are validated via Zod schemas before executing Prisma operations.
 
@@ -44,14 +44,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | `createDomain` | `{ name, code, description? }` | `prisma.domain.create()` | Created domain record |
 | `updateDomain` | `{ domainCode, name?, description? }` | `prisma.domain.update()` | Updated domain record |
 
-### C. Live WhatsApp Inspection Tools (`src/agent/tools/whatsapp-tools.ts`)
-| Tool | Input Schema | Operation | Returns |
-| :--- | :--- | :--- | :--- |
-| `listWhatsAppGroups` | `{ searchName? }` | `sock.groupFetchAllParticipating()` | Group[] with JID, subject, member count |
-| `getWhatsAppGroupMembers` | `{ groupJid?, groupName? }` | `sock.groupMetadata()` | Roster with phone numbers, JIDs, roles |
-| `syncGroupMembersToDb` | `{ groupJid?, groupName?, defaultYear?, domainCodes? }` | `sock.groupMetadata()` + `prisma.person.upsert()` | Sync summary & member list |
-
-### D. Safe Schema Evolution Tool (`src/agent/tools/schema-tools.ts`)
+### C. Safe Schema Evolution Tool (`src/agent/tools/schema-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `executeDatabaseQuery` | `{ sql, reason, confirmationToken }` | `prisma.$executeRawUnsafe()` / `$queryRawUnsafe()` | Affected rows / query dataset |
@@ -62,8 +55,8 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 
 The system prompt (`src/agent/prompts.ts`) defines:
 1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
-2. **WhatsApp Awareness**: Inspects live groups and member rosters on demand.
-3. **Chat-Driven Seeding**: Direct member/domain creation and updates from chat prompts.
+2. **Zero WhatsApp Access**: Interacts strictly with PostgreSQL database records, never with WhatsApp client internals.
+3. **Chat-Driven Administration**: Direct member/domain creation and updates from chat prompts.
 4. **Mandatory Double-Confirmation**: For `executeDatabaseQuery`, must issue token, request confirmation, and verify response before execution.
 5. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
 
@@ -81,11 +74,10 @@ The system prompt (`src/agent/prompts.ts`) defines:
 
 | File | Responsibility |
 | :--- | :--- |
-| `src/agent/brain.ts` | Core orchestrator: `generateText()` with all registered tools and real-time step logging |
-| `src/agent/tools/index.ts` | Tool registry exporting all 14 tools |
+| `src/agent/brain.ts` | Core orchestrator: `generateText()` with database tools and real-time step logging |
+| `src/agent/tools/index.ts` | Tool registry exporting all 11 database tools |
 | `src/agent/tools/task-tools.ts` | Task CRUD & workflow transitions |
 | `src/agent/tools/people-tools.ts` | Member & domain management |
-| `src/agent/tools/whatsapp-tools.ts` | Live WhatsApp socket querying and member syncing |
 | `src/agent/tools/schema-tools.ts` | Guarded raw SQL and DDL schema execution |
 | `src/agent/context.ts` | Sliding-window conversation context manager |
 | `src/agent/prompts.ts` | System prompt with schema awareness and confirmation rules |

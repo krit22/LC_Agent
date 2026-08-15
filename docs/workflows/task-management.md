@@ -1,6 +1,6 @@
 # Workflow: Task Management & Predefined Workflows
 
-This document describes how the AI Agent Brain parses, creates, and transitions tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle), as well as administering members and domains.
+This document describes how the AI Agent Brain parses, creates, and transitions tasks across flexible states and predefined workflow pipelines (such as the Poster Making lifecycle), as well as administering members and domains in the database.
 
 ---
 
@@ -75,20 +75,9 @@ When a reviewer requests revisions on a poster or task:
 
 ## 4. Agent Conversational Examples
 
-The agent is activated by the `lc ` trigger prefix in WhatsApp chats.
+The agent is activated by the `lc ` trigger prefix in authorized WhatsApp chats.
 
-### A. WhatsApp Group Discovery & Seeding
-```text
-User:  lc list all groups you are in
-Agent: 📋 Active WhatsApp Groups:
-       1. The Literary Circle Core (18 members) — JID: 120363123456@g.us
-       2. LC Design & Web Team (9 members) — JID: 120363987654@g.us
-
-User:  lc import all members from the Core group and assign them to 2nd year
-Agent: ✅ Synced 18 members from "The Literary Circle Core" into the database (Year: 2).
-```
-
-### B. Chat-Driven Member Administration
+### A. Chat-Driven Member Administration
 ```text
 User:  lc add Rahul Sharma, 3rd year, domains: web_dev, graphic_design, role: Lead
 Agent: ✅ Added Rahul Sharma (Year 3, Lead) linked to Web Development & Graphic Designing.
@@ -97,7 +86,7 @@ User:  lc change Rahul's role to President
 Agent: ✅ Updated Rahul Sharma's role to President.
 ```
 
-### C. Task Creation & Workflow Progression
+### B. Task Creation & Workflow Progression
 ```text
 User:  lc create a poster task for the Annual Hackathon, assign to Rahul, high priority
 Agent: ✅ Task created:
@@ -108,6 +97,17 @@ Agent: ✅ Task created:
 
 User:  lc update the hackathon poster task to EDITING
 Agent: ✅ Updated "Poster for Annual Hackathon" status → EDITING.
+```
+
+### C. Querying Tasks & Members
+```text
+User:  lc what tasks are currently ongoing?
+Agent: Active tasks:
+       1. Poster for Annual Hackathon (Assignee: Rahul Sharma, Stage: EDITING, Priority: high)
+
+User:  lc list all members in Graphic Designing
+Agent: Graphic Designing Members:
+       • Rahul Sharma (Year 3, President)
 ```
 
 ### D. Safe Schema Evolution (Two-Step Confirmation)
