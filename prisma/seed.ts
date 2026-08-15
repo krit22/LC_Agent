@@ -1,28 +1,30 @@
 import 'dotenv/config'
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { prisma } from '../src/db/prisma.js'
 
 const INITIAL_DOMAINS = [
   {
     name: 'Web Development',
     code: 'web_dev',
-    description: 'Web development, club portals, bot infrastructure, and tech maintenance.',
+    description:
+      'Web development, club portals, bot infrastructure, and tech maintenance.',
   },
   {
     name: 'Video Editing',
     code: 'video_editing',
-    description: 'Video production, reels, promotional clips, and event coverage edits.',
+    description:
+      'Video production, reels, promotional clips, and event coverage edits.',
   },
   {
     name: 'Content Writing',
     code: 'content_writing',
-    description: 'Literary content, newsletters, captions, articles, and event scripts.',
+    description:
+      'Literary content, newsletters, captions, articles, and event scripts.',
   },
   {
     name: 'Graphic Designing',
     code: 'graphic_design',
-    description: 'Posters, social media creatives, banners, brochures, and visual branding.',
+    description:
+      'Posters, social media creatives, banners, brochures, and visual branding.',
   },
 ]
 
