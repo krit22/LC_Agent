@@ -12,11 +12,32 @@ export interface TriggerResult {
 }
 
 /**
+ * Checks if a JID represents a WhatsApp Group chat.
+ * Group JIDs always end with '@g.us'.
+ */
+export function isGroupChat(jid: string): boolean {
+  return jid.endsWith('@g.us')
+}
+
+/**
  * Check if a message comes from an allowed group.
- * If no groups are configured, ALL groups are allowed (useful for dev).
+ *
+ * Invariants:
+ * 1. Direct Messages (DMs) / 1-on-1 chats are STRICTLY BLOCKED to protect privacy.
+ * 2. Only WhatsApp Groups (ending in @g.us) are eligible.
+ * 3. If ALLOWED_GROUP_JIDS is configured, the group must also be in that allowlist.
  */
 export function isAllowedGroup(groupJid: string): boolean {
-  if (config.allowedGroupJids.length === 0) return true
+  // Strict block for non-group chats (DMs, broadcasts, etc.)
+  if (!isGroupChat(groupJid)) {
+    return false
+  }
+
+  // If no specific group JIDs are restricted in config, all group chats are allowed
+  if (config.allowedGroupJids.length === 0) {
+    return true
+  }
+
   return config.allowedGroupJids.includes(groupJid)
 }
 

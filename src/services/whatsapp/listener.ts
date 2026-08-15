@@ -1,6 +1,6 @@
 import type { WASocket, WAMessage } from '@whiskeysockets/baileys'
 import { normalizeMessage } from '../../gateway/message-normalizer.js'
-import { isAllowedGroup, checkTrigger } from '../../gateway/trigger-filter.js'
+import { isAllowedGroup, isGroupChat, checkTrigger } from '../../gateway/trigger-filter.js'
 import { processCommand } from '../../agent/brain.js'
 import { reactToMessage, sendReply, setTyping, clearTyping } from './responder.js'
 import { prisma } from '../../db/prisma.js'
@@ -35,8 +35,8 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   const normalized = normalizeMessage(msg, sock)
   if (!normalized) return
 
-  const isGroup = normalized.groupJid.endsWith('@g.us')
-  const chatType = isGroup ? 'Group' : 'Direct Chat'
+  const isGroup = isGroupChat(normalized.groupJid)
+  const chatType = isGroup ? 'Group' : 'Direct Chat (DM)'
   const senderTag = normalized.fromMe ? `${normalized.senderName} [Self / Admin]` : normalized.senderName
 
   console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
@@ -45,14 +45,21 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   console.log(`   Chat:    ${normalized.groupJid} [${chatType}]`)
   console.log(`   Content: "${normalized.text}"`)
 
-  // Step 2: Check group whitelist
-  if (!isAllowedGroup(normalized.groupJid)) {
-    console.log(`   Action:  ⏭️ Ignored (Chat not in ALLOWED_GROUP_JIDS)`)
+  // Step 2: Strict Block for Direct Messages (DMs)
+  if (!isGroup) {
+    console.log(`   Action:  ⏭️ Ignored (Direct Messages / DMs are strictly blocked. Group chats only.)`)
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
     return
   }
 
-  // Step 3: Check trigger keyword
+  // Step 3: Check group whitelist
+  if (!isAllowedGroup(normalized.groupJid)) {
+    console.log(`   Action:  ⏭️ Ignored (Group not in ALLOWED_GROUP_JIDS)`)
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
+    return
+  }
+
+  // Step 4: Check trigger keyword
   const trigger = checkTrigger(normalized)
 
   if (!trigger.triggered) {
@@ -79,7 +86,7 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
 
   console.log(`   Action:  🟢 TRIGGER ACTIVATED! Command: "${trigger.commandText}"`)
 
-  // Step 4: Deduplication check
+  // Step 5: Deduplication check
   const existing = await prisma.messageAuditLog.findUnique({
     where: { messageId: normalized.messageId },
   })
@@ -89,7 +96,7 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
     return
   }
 
-  // Step 5: Create audit log entry (processed = false)
+  // Step 6: Create audit log entry (processed = false)
   await prisma.messageAuditLog.create({
     data: {
       messageId: normalized.messageId,
@@ -101,20 +108,20 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
     },
   })
 
-  // Step 6: Visual feedback — react ⏳ and show typing
+  // Step 7: Visual feedback — react ⏳ and show typing
   console.log(`   Feedback: Reacting with ⏳ & setting presence to 'composing'...`)
   await reactToMessage(sock, normalized.groupJid, msg.key, '⏳')
   await setTyping(sock, normalized.groupJid)
 
   try {
-    // Step 7: Process through agent brain
+    // Step 8: Process through agent brain
     const result = await processCommand(
       normalized.groupJid,
       trigger.commandText!,
       normalized.senderName,
     )
 
-    // Step 8: Send reply and update reaction
+    // Step 9: Send reply and update reaction
     await clearTyping(sock, normalized.groupJid)
     await sendReply(
       sock,
@@ -133,7 +140,7 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
     console.log(`\n📤 [WhatsApp Outgoing] Quoted reply sent back to ${normalized.groupJid} with reaction ${result.success ? '✅' : '❌'}`)
     console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`)
 
-    // Step 9: Mark audit log as processed
+    // Step 10: Mark audit log as processed
     await prisma.messageAuditLog.update({
       where: { messageId: normalized.messageId },
       data: {
