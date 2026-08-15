@@ -1,9 +1,8 @@
 import type { WASocket, WAMessage } from '@whiskeysockets/baileys'
 import { normalizeMessage } from '../../gateway/message-normalizer.js'
 import {
-  isAllowedChannel,
+  isAllowedMessage,
   isGroupChat,
-  isSelfChat,
   checkTrigger,
 } from '../../gateway/trigger-filter.js'
 import { processCommand } from '../../agent/brain.js'
@@ -41,7 +40,7 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   if (!normalized) return
 
   const isGroup = isGroupChat(normalized.groupJid)
-  const isSelf = isSelfChat(normalized.groupJid, normalized.fromMe, sock.user?.id)
+  const isSelf = normalized.fromMe && normalized.senderJid.split('@')[0] === normalized.groupJid.split('@')[0]
   const chatType = isGroup ? 'Group' : isSelf ? 'Chat with Self' : 'Direct Chat (DM)'
   const senderTag = normalized.fromMe ? `${normalized.senderName} [Self / Admin]` : normalized.senderName
 
@@ -51,10 +50,13 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   console.log(`   Chat:    ${normalized.groupJid} [${chatType}]`)
   console.log(`   Content: "${normalized.text}"`)
 
-  // Step 2: Check channel eligibility (Groups + Chat with Self allowed; external DMs blocked)
-  if (!isAllowedChannel(normalized.groupJid, normalized.fromMe, sock.user?.id)) {
-    if (!isGroup && !isSelf) {
-      console.log(`   Action:  ⏭️ Ignored (External 1:1 DMs are strictly blocked. Group chats & Chat with self only.)`)
+  // Step 2: Check message eligibility
+  // Rules:
+  // - Groups (@g.us): Processes both self and other members' messages (subject to ALLOWED_GROUP_JIDS).
+  // - DMs (1:1): ONLY processes self-sent messages (fromMe = true). Incoming DMs from contacts are ignored.
+  if (!isAllowedMessage(normalized.groupJid, normalized.fromMe)) {
+    if (!isGroup) {
+      console.log(`   Action:  ⏭️ Ignored (Incoming DM from contact. DMs only respond to self-sent commands.)`)
     } else {
       console.log(`   Action:  ⏭️ Ignored (Group not in ALLOWED_GROUP_JIDS)`)
     }

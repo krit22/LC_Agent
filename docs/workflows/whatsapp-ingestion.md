@@ -1,6 +1,6 @@
 # Workflow: WhatsApp Ingestion
 
-This document details the end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering channels (allowing groups and Chat with Self while blocking external DMs), validating with the trigger keyword, and dispatching events to the Agent Brain.
+This document details the end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering channels (allowing all group members and DM self-sent messages only), validating with the trigger keyword, and dispatching events to the Agent Brain.
 
 ---
 
@@ -15,11 +15,11 @@ This document details the end-to-end flow for connecting to WhatsApp, receiving 
            │
            │ messages.upsert (type === 'notify')
            ▼
-[ Layer 2: Channel Filter ] ─── Is it a Group Chat (@g.us) OR Chat with Self?
-           │                    NO → silently ignore (external DMs blocked)
+[ Layer 2: Permission Gate ] ── Is it a Group Chat (@g.us) OR sent by me (fromMe)?
+           │                    NO (incoming DM from contact) → silently ignore
            │                    YES ↓
            ▼
-[ Layer 2: Group Whitelist ] ── Is remoteJid in ALLOWED_GROUP_JIDS?
+[ Layer 2: Group Whitelist ] ── If group, is remoteJid in ALLOWED_GROUP_JIDS?
            │                    NO → silently ignore
            │                    YES ↓
            ▼
@@ -56,11 +56,10 @@ This document details the end-to-end flow for connecting to WhatsApp, receiving 
 - On subsequent boots, the session resumes silently.
 - Disconnections trigger auto-reconnect unless `DisconnectReason.loggedOut`.
 
-### Step 2: Channel Eligibility & Trigger Filtering
-- **Channel Verification**:
-  1. **Groups**: Any chat ending with `@g.us` (checked against `ALLOWED_GROUP_JIDS` if configured).
-  2. **Chat with Self**: Messages sent to one's own account ("Message yourself") for private bot administration.
-  3. **External DMs**: 1-on-1 chats with other contacts are strictly blocked to protect privacy.
+### Step 2: Channel & Sender Eligibility
+- **Permission Matrix**:
+  1. **Groups (`@g.us`)**: Messages from all participants and the admin are accepted (subject to `ALLOWED_GROUP_JIDS` if configured).
+  2. **Direct Messages (1:1 DMs)**: Only messages sent by the account owner (`fromMe = true`) are accepted. Incoming DMs from external contacts are blocked.
 - Only real-time deliveries (`type === 'notify'`) are processed; backfills (`type === 'append'`) are skipped.
 - Text is extracted from `conversation`, `extendedTextMessage.text`, or `imageMessage.caption`.
 - **Trigger gate**: If the text does not start with the trigger keyword (`lc `), the message is logged to `message_audit_logs` with `intent_detected = 'IGNORED'` and no further action is taken.

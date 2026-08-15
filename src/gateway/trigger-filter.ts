@@ -20,54 +20,30 @@ export function isGroupChat(jid: string): boolean {
 }
 
 /**
- * Checks if a message is from the user's "Chat with self" / "Message yourself" conversation.
+ * Check if an incoming message is eligible for processing based on chat type & sender permissions.
+ *
+ * Permission Invariants:
+ * 1. Groups (@g.us): Responds to BOTH messages from the user (fromMe = true)
+ *    and other group participants (fromMe = false), subject to ALLOWED_GROUP_JIDS.
+ * 2. Direct Messages (DMs / 1:1 chats): Responds ONLY to messages sent by the user (fromMe = true).
+ *    Incoming DMs from other people (fromMe = false) are strictly ignored to prevent unauthorized access.
  */
-export function isSelfChat(
+export function isAllowedMessage(
   remoteJid: string,
   fromMe: boolean,
-  myUserJid?: string,
 ): boolean {
-  if (!fromMe) return false
-  if (!myUserJid) return false
+  const isGroup = isGroupChat(remoteJid)
 
-  const cleanMyJid = myUserJid.split('@')[0].split(':')[0]
-  const cleanRemoteJid = remoteJid.split('@')[0].split(':')[0]
-
-  return cleanMyJid === cleanRemoteJid
-}
-
-/**
- * Check if a message comes from an eligible channel.
- *
- * Allowed channels:
- * 1. Any WhatsApp Group (ending in @g.us) that matches ALLOWED_GROUP_JIDS (if configured).
- * 2. Personal "Chat with self" (Message yourself) for bot administration & private commands.
- *
- * Blocked channels:
- * 1. 1-on-1 Direct Messages (DMs) with other contacts (to protect personal privacy).
- * 2. Broadcasts (status@broadcast).
- */
-export function isAllowedChannel(
-  remoteJid: string,
-  fromMe: boolean,
-  myUserJid?: string,
-): boolean {
-  // Allow "Chat with self"
-  if (isSelfChat(remoteJid, fromMe, myUserJid)) {
-    return true
+  if (isGroup) {
+    // In groups, allow both self and other members (subject to allowlist if set)
+    if (config.allowedGroupJids.length === 0) {
+      return true
+    }
+    return config.allowedGroupJids.includes(remoteJid)
   }
 
-  // If not self-chat, it MUST be a group chat
-  if (!isGroupChat(remoteJid)) {
-    return false
-  }
-
-  // If specific group JIDs are allowlisted, verify membership
-  if (config.allowedGroupJids.length === 0) {
-    return true
-  }
-
-  return config.allowedGroupJids.includes(remoteJid)
+  // In DMs (1:1 chats), ONLY process messages sent by the user (fromMe: true)
+  return fromMe
 }
 
 /**

@@ -9,9 +9,9 @@ These stable principles govern all product decisions, code designs, and schema m
 - Use **Vercel AI SDK** for LLM integration — a single `generateText()` call with typed tools, not heavyweight agent frameworks.
 - Avoid introducing heavy dependencies when simple, standard Node.js / TypeScript libraries suffice.
 
-## 2. Channel Scope & Privacy Isolation
-- **Supported Channels**: The agent operates in **WhatsApp Group chats** (`@g.us`) and in the admin's personal **"Chat with self"** ("Message yourself").
-- **External DM Isolation**: 1-on-1 Direct Messages with other contacts (`@s.whatsapp.net`) and status broadcasts (`status@broadcast`) are strictly blocked and discarded at the gateway level to protect personal chat privacy.
+## 2. Channel & Sender Permissions
+- **Group Chats (`@g.us`)**: Responds to commands (`lc `) sent by **both** the account owner (admin) and other club members, keeping the task brain accessible to the entire group.
+- **Direct Messages (1:1 DMs)**: Responds **exclusively** to messages sent by the account owner (`fromMe = true`). Incoming messages from external contacts in DMs are strictly blocked to prevent unauthorized control.
 
 ## 3. Trigger-Gated Activation
 - The backend receives messages from permitted channels but only activates the agent brain when a message starts with the configured trigger keyword (`lc `).
