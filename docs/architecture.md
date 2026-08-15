@@ -4,37 +4,73 @@ This document describes the high-level architecture, subsystem boundaries, data 
 
 ---
 
-## 1. System Topology
+## 1. System Topology — 5-Layer Architecture
 
 ```text
-┌────────────────────────────────────────────────────────┐
-│                   WhatsApp Channels                    │
-└──────────────────────────┬─────────────────────────────┘
-                           │ Baileys WebSocket connection
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│             WhatsApp Ingestion Service                 │
-│  - @whiskeysockets/baileys multi-device socket         │
-│  - Auth state store & reconnection manager             │
-│  - Event filter & deduplication gateway                │
-└──────────────────────────┬─────────────────────────────┘
-                           │ Normalized Message Event
-                           ▼
-┌────────────────────────────────────────────────────────┐
-│                 AI Agent Brain Layer                   │
-│  - Intent classifier & prompt parser                   │
-│  - Schema extractor (People, Tasks, Actions)           │
-│  - Decision & response generator                       │
-└──────────────┬─────────────────────────┬───────────────┘
-               │ Query / Mutation        │ API Access / Stats
-               ▼                         ▼
-┌──────────────────────────┐   ┌─────────────────────────┐
-│     PostgreSQL DB        │   │    Hono HTTP Server     │
-│  - people                │   │  - /health              │
-│  - tasks                 │   │  - /api/people          │
-│  - messages_audit        │   │  - /api/tasks           │
-│  - domains               │   │  - /api/agent/status    │
-└──────────────────────────┘   └─────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                   WhatsApp Groups (Monitored)                    │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ Baileys WebSocket
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  LAYER 1 — WhatsApp Gateway                                     │
+│  src/services/whatsapp/client.ts                                 │
+│  • makeWASocket + useMultiFileAuthState + auto-reconnect         │
+│  • ev.process() batched event handling                           │
+│  Output: Raw WAMessage from messages.upsert (type === 'notify') │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ all messages
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  LAYER 2 — Message Gateway & Trigger Filter                     │
+│  src/gateway/trigger-filter.ts + message-normalizer.ts           │
+│  • Group whitelist check (ALLOWED_GROUP_JIDS)                    │
+│  • Text extraction & normalization                               │
+│  • Trigger keyword gate: only "lc ..." messages pass             │
+│  • Deduplication via message_audit_logs                           │
+│  Output: cleaned command text + sender + context metadata        │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ only triggered messages
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  LAYER 3 — Conversation Context Manager                         │
+│  src/agent/context.ts                                            │
+│  • In-memory Map<groupJid, ConversationEntry[]>                  │
+│  • Sliding window: last 15 messages per group                    │
+│  • TTL: 30-minute inactivity expiry                              │
+│  • Enables follow-up questions without re-stating context        │
+│  Output: message + recent conversation history array             │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ message + history
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  LAYER 4 — Agent Brain (LLM + Tool Calling)                     │
+│  src/agent/brain.ts + tools/*.ts + prompts.ts                    │
+│  • Vercel AI SDK generateText() with OpenRouter provider         │
+│  • 7 Prisma-backed tools: listTasks, getTask, createTask,        │
+│    updateTask, listPeople, getPerson, listDomains                │
+│  • Multi-step reasoning (maxSteps: 5)                            │
+│  • Hard boundary: NO schema changes, NO deletes                  │
+│  Output: responseText + tool execution results                   │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │ response
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│  LAYER 5 — WhatsApp Responder                                   │
+│  src/services/whatsapp/responder.ts                              │
+│  • React ⏳ before processing, ✅ after success, ❌ on error       │
+│  • Send quoted reply with @mentions                              │
+│  • Mark audit log as processed                                   │
+│  • Append assistant response to conversation context             │
+│  Output: WhatsApp message delivered to group                     │
+└──────────────────────────────────────────────────────────────────┘
+
+          ┌──────────────────────┐   ┌────────────────────────┐
+          │   PostgreSQL DB      │   │   Hono HTTP Server     │
+          │   (Supabase)         │   │   /health, /api/*      │
+          │   Accessed by L4     │   │   Monitoring & Admin   │
+          │   tools via Prisma   │   │   endpoints            │
+          └──────────────────────┘   └────────────────────────┘
 ```
 
 ---
@@ -43,27 +79,45 @@ This document describes the high-level architecture, subsystem boundaries, data 
 
 | Component | Technology | Primary Responsibilities |
 | :--- | :--- | :--- |
-| **HTTP API Layer** | Hono (Node.js) | Exposes health checks, CRUD endpoints for dashboard/admin, webhook triggers, and agent monitoring. |
-| **WhatsApp Ingestion** | `@whiskeysockets/baileys` | Maintains socket connection to WhatsApp, persists multi-file auth credentials, receives message events, filters target channels/groups. |
-| **Agent Brain Engine** | TypeScript Modules | Processes messages through extraction rules / LLM prompts, identifies entities (people, tasks), coordinates actions. |
-| **Persistence Layer** | Supabase (PostgreSQL) + Prisma ORM | Stores persistent records of people, domains, tasks, and historical message audits via type-safe Prisma client. |
+| **WhatsApp Gateway** | `@whiskeysockets/baileys`, `pino`, `qrcode-terminal` | Socket lifecycle, auth persistence, QR pairing, reconnection, event batching. |
+| **Message Gateway** | TypeScript Modules | Group whitelist, trigger keyword filtering (`lc` prefix), text normalization, deduplication gate. |
+| **Context Manager** | In-memory `Map` | Short-term sliding-window conversation history per group. TTL-based expiry. No persistence. |
+| **Agent Brain** | Vercel AI SDK (`ai`), OpenRouter (`@openrouter/ai-sdk-provider`), `zod` | LLM reasoning via `generateText()` with Zod-typed tools. Multi-step tool calling against Prisma. |
+| **WhatsApp Responder** | `@whiskeysockets/baileys` | Reactions, presence updates, quoted replies with mentions, audit log finalization. |
+| **HTTP API** | Hono v4 | Health checks, CRUD endpoints for admin/dashboard, agent status monitoring. |
+| **Persistence** | Supabase (PostgreSQL) + Prisma 7 | Type-safe storage for people, domains, tasks, and message audit logs. |
 
 ---
 
 ## 3. Data Flow
 
-1. **Ingestion**: A user sends a message in a monitored WhatsApp group. Baileys fires the `messages.upsert` event.
-2. **Filtering & Deduplication**: The event filter checks if the message comes from an authorized channel and verifies that `message_id` has not been processed.
-3. **Brain Extraction**: The message text and metadata (sender, timestamp, channel) are forwarded to the Agent Brain parser.
-4. **Database Mutation**:
-   - If a person intro or domain assignment is recognized, `people` is updated.
-   - If a task or assignment is detected, a new record in `tasks` is created with a reference to the assigned person.
-5. **Action / Response** (optional): The agent can reply in-channel via Baileys socket or publish the state to the Hono API.
+1. **Ingestion**: A user sends a message in a monitored WhatsApp group. Baileys fires `messages.upsert` via `ev.process()`.
+2. **Filtering**: The gateway checks group whitelist, extracts text, and checks for the `lc` trigger prefix. Non-triggered messages are logged and ignored.
+3. **Context**: The triggered message is appended to the group's short-term conversation history (sliding window of 15 messages, 30-min TTL).
+4. **Reasoning**: The AI Agent Brain receives the message and conversation history, reasons over the request, and calls database tools (create/update/query tasks, look up people and domains) via multi-step tool calling.
+5. **Response**: The agent's text response is sent back as a quoted reply in WhatsApp with appropriate reactions and mentions.
 
 ---
 
 ## 4. Trust Boundaries & Security
 
-- **WhatsApp Socket**: Authentication credentials (`auth_info_baileys`) represent full account access. They must be stored in a secured directory and never committed to version control.
-- **Database Access**: PostgreSQL connection uses credentials from `DATABASE_URL`. Connection pooling must be configured with sane timeouts and limits.
-- **API Boundary**: Hono backend endpoints for reading or updating records must be protected via authentication headers or restricted network access.
+- **WhatsApp Socket**: Auth credentials (`auth_info_baileys/`) represent full account access. Never committed to version control.
+- **LLM Provider**: `OPENROUTER_API_KEY` must be stored in `.env`, never hardcoded. The agent has no access to this key at runtime.
+- **Agent Authority Boundary**: The agent can INSERT and UPDATE records but cannot DELETE entities or ALTER schema. This is enforced at the tool level — no destructive tools exist.
+- **Database Access**: PostgreSQL credentials from `DATABASE_URL`. Connection pooling with sane timeouts.
+- **API Boundary**: Hono endpoints must be protected via authentication headers or restricted network access in production.
+
+---
+
+## 5. Configuration
+
+| Variable | Purpose |
+| :--- | :--- |
+| `DATABASE_URL` | Supabase connection pooler URL |
+| `DIRECT_URL` | Supabase direct connection for migrations |
+| `OPENROUTER_API_KEY` | OpenRouter API key (routes to any LLM) |
+| `OPENROUTER_MODEL` | Model identifier (e.g. `google/gemini-2.5-flash`) |
+| `TRIGGER_KEYWORD` | Prefix that activates the agent (default: `lc`) |
+| `ALLOWED_GROUP_JIDS` | Comma-separated monitored WhatsApp group JIDs |
+| `CONTEXT_MAX_MESSAGES` | Sliding window size (default: `15`) |
+| `CONTEXT_TTL_MINUTES` | Inactivity timeout for context (default: `30`) |

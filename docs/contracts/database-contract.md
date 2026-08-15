@@ -38,6 +38,7 @@ This contract defines the invariants, connection lifecycle, and safety boundarie
 | Generate Prisma Client | `npm run db:generate` | Generates `@prisma/client` from schema |
 | Push Schema to DB | `npm run db:push` | Syncs schema directly without creating migration files |
 | Create Migration | `npm run db:migrate` | Generates and runs versioned SQL migrations |
+| Seed Initial Domains | `npm run db:seed` | Populates the 4 core club domains via prisma/seed.ts |
 | Open Prisma Studio | `npm run db:studio` | Opens visual database browser |
 | Start Local Supabase | `npm run supabase:start` | Boots local Supabase Docker stack |
 | Check Supabase Status | `npm run supabase:status` | Displays local API/DB ports and keys |

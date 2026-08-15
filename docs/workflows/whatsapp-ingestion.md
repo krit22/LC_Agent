@@ -1,32 +1,45 @@
 # Workflow: WhatsApp Ingestion
 
-This document details the observable end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering target conversations, and dispatching events to the Agent Brain.
+This document details the end-to-end flow for connecting to WhatsApp, receiving messages via Baileys, filtering with the trigger keyword, and dispatching events to the Agent Brain.
 
 ---
 
 ## 1. Flow Overview
 
 ```text
-[ WhatsApp Cloud / Group ]
+[ WhatsApp Group Message ]
            │
-           │ (Baileys WebSocket)
+           │ (Baileys WebSocket, ev.process)
            ▼
-[ Connection Handler ] ──── QR Code / Credentials Restore
+[ Layer 1: Socket Gateway ] ─── QR pairing / credential restore / reconnect
            │
-           │ `messages.upsert`
+           │ messages.upsert (type === 'notify')
            ▼
-[ Channel Filter ] ──────── Discard non-monitored groups & statuses
-           │
-           │ Authorized Message
+[ Layer 2: Group Whitelist ] ── Is remoteJid in ALLOWED_GROUP_JIDS?
+           │                    NO → silently ignore
+           │                    YES ↓
            ▼
-[ Deduplication Check ] ─── Reject if message_id exists in message_audit_logs
-           │
-           │ New Unprocessed Message
-           ▼
-[ Audit Log Save ] ──────── Insert into message_audit_logs (processed = false)
+[ Layer 2: Text Extraction ] ── Pull from conversation / extendedTextMessage / caption
            │
            ▼
-[ Dispatch to Brain ] ───── Trigger entity extraction and reasoning
+[ Layer 2: Trigger Gate ] ───── Does text start with "lc " (case-insensitive)?
+           │                    NO → log to audit with intent='IGNORED', stop
+           │                    YES → strip prefix, continue ↓
+           ▼
+[ Layer 2: Dedup Check ] ────── message_id exists in message_audit_logs?
+           │                    YES → skip (idempotent)
+           │                    NO → insert audit log (processed=false) ↓
+           ▼
+[ Layer 3: Context Manager ] ── Append to group's conversation history
+           │
+           ▼
+[ Layer 5: React ⏳ ] ──────── Visual feedback: processing started
+           │
+           ▼
+[ Layer 4: Agent Brain ] ────── LLM reasoning + tool calls
+           │
+           ▼
+[ Layer 5: Reply + React ✅ ] ─ Quoted reply + update audit log (processed=true)
 ```
 
 ---
@@ -34,18 +47,29 @@ This document details the observable end-to-end flow for connecting to WhatsApp,
 ## 2. Step-by-Step Lifecycle
 
 ### Step 1: Authentication & Socket Initialization
-- Baileys uses `useMultiFileAuthState` to save credentials locally in a non-committed directory (e.g. `./auth_info_baileys/`).
-- On first start, the terminal prints a QR code (or pairing code) for the admin device to link.
-- On subsequent boots, the session resumes silently without requiring re-authentication.
+- Baileys uses `useMultiFileAuthState` to save credentials in `./auth_info_baileys/` (never committed).
+- On first start, `qrcode-terminal` renders the QR code for device pairing.
+- On subsequent boots, the session resumes silently.
+- Disconnections trigger auto-reconnect unless `DisconnectReason.loggedOut`.
 
-### Step 2: Channel Whitelisting
-- Not all messages should be processed. The system checks `msg.key.remoteJid` against a configured allow-list of group JIDs (`ALLOWED_GROUP_JIDS`).
-- Broadcast status updates (`status@broadcast`) and direct 1-to-1 spam are filtered out unless explicitly permitted.
+### Step 2: Group Whitelist & Trigger Filtering
+- The system checks `msg.key.remoteJid` against `ALLOWED_GROUP_JIDS` from config.
+- Only real-time deliveries (`type === 'notify'`) are processed; backfills (`type === 'append'`) are skipped.
+- Text is extracted from `conversation`, `extendedTextMessage.text`, or `imageMessage.caption`.
+- **Trigger gate**: If the text does not start with the trigger keyword (`lc`), the message is logged to `message_audit_logs` with `intent_detected = 'IGNORED'` and no further action is taken.
+- If triggered, the `lc ` prefix is stripped, leaving the clean command text.
 
-### Step 3: Message Parsing & Extraction
-- Plain text, extended text (`extendedTextMessage`), and captioned media messages are extracted and normalized to standard text.
-- Metadata (sender JID, sender push name, timestamp, message ID) is structured.
+### Step 3: Deduplication & Audit Logging
+- The `message_id` is checked against `message_audit_logs` to prevent duplicate processing.
+- New messages are inserted with `processed = false`.
 
-### Step 4: Event Forwarding & Brain Dispatch
-- The normalized event payload is handed off to the Agent Brain processing pipeline.
-- If processing succeeds, the audit log record is marked `processed = true`.
+### Step 4: Context & Agent Processing
+- The cleaned message is appended to the group's short-term conversation context (sliding window, 15 messages, 30-min TTL).
+- The agent reacts with ⏳ and sets presence to `composing`.
+- The Agent Brain receives the message + conversation history and reasons via `generateText()` with tools.
+
+### Step 5: Response & Finalization
+- The agent's response is sent as a quoted reply in WhatsApp with appropriate `@mentions`.
+- The reaction is updated to ✅ (success) or ❌ (error).
+- The audit log is updated to `processed = true` with the detected intent.
+- The assistant response is appended to the conversation context.

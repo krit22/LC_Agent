@@ -50,7 +50,9 @@ Implementation & Focused Tests (src/...)
 
 - **Backend Framework**: [Hono](https://hono.dev/) v4 on Node.js (TypeScript ESM).
 - **Database**: PostgreSQL (relational storage for people, tasks, message audit logs, domain metadata).
+- **ORM**: [Prisma](https://www.prisma.io/) v7 with Supabase PostgreSQL.
 - **Messaging Integration**: [@whiskeysockets/baileys](https://github.com/whiskeysockets/Baileys) for WhatsApp multi-device socket connection and channel listening.
+- **AI Agent Framework**: [Vercel AI SDK](https://ai-sdk.dev/) (`ai`) with [OpenRouter](https://openrouter.ai/) (`@openrouter/ai-sdk-provider`) for LLM-powered tool calling. Schemas validated with [Zod](https://zod.dev/).
 - **Security & Reliability Invariants**:
   1. **Strict Localhost Binding**: During local development and testing, servers must bind to `127.0.0.1` / `localhost`.
   2. **Zero Hardcoded Secrets**: WhatsApp auth credentials, database connection strings, and API keys must be loaded via environment variables or secure session stores, never committed.

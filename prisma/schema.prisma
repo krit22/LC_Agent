@@ -9,10 +9,12 @@ generator client {
 model Domain {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique @db.VarChar(100)
+  code        String   @unique @db.VarChar(50)
   description String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
-  people Person[]
+  members PersonDomain[]
+  tasks   Task[]
 
   @@map("domains")
 }
@@ -20,32 +22,49 @@ model Domain {
 model Person {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(255)
+  year      Int      @db.SmallInt // 1, 2, 3, or 4
   phoneJid  String?  @unique @map("phone_jid") @db.VarChar(100)
-  domainId  String?  @map("domain_id") @db.Uuid
   role      String   @default("member") @db.VarChar(100)
   metadata  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
-  domain Domain? @relation(fields: [domainId], references: [id], onDelete: SetNull)
-  tasks  Task[]
+  domains PersonDomain[]
+  tasks   Task[]
 
   @@map("people")
+}
+
+model PersonDomain {
+  personId  String   @map("person_id") @db.Uuid
+  domainId  String   @map("domain_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@id([personId, domainId])
+  @@map("person_domains")
 }
 
 model Task {
   id              String    @id @default(uuid()) @db.Uuid
   task            String    @db.Text
   description     String?   @db.Text
-  assignedTo      String?   @map("assigned_to") @db.Uuid
-  status          String    @default("pending") @db.VarChar(50)
-  priority        String    @default("medium") @db.VarChar(20)
+  assignedToId    String?   @map("assigned_to") @db.Uuid
+  domainId        String?   @map("domain_id") @db.Uuid
+  workflowType    String    @default("GENERAL") @map("workflow_type") @db.VarChar(50) // "GENERAL" | "POSTER"
+  status          String    @default("ASSIGNED") @db.VarChar(50)
+  feedback        String?   @db.Text // Holds details for "changes requested" or review notes
+  priority        String    @default("medium") @db.VarChar(20) // "low" | "medium" | "high" | "urgent"
   dueDate         DateTime? @map("due_date") @db.Timestamptz()
+  metadata        Json      @default("{}")
   sourceMessageId String?   @map("source_message_id") @db.VarChar(255)
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
-  assignee Person? @relation(fields: [assignedTo], references: [id], onDelete: SetNull)
+  assignee Person? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  domain   Domain? @relation(fields: [domainId], references: [id], onDelete: SetNull)
 
   @@map("tasks")
 }

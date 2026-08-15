@@ -10,19 +10,31 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "dependencies": {
+    "@hapi/boom": "^10.0.1",
     "@hono/node-server": "^2.1.1",
+    "@openrouter/ai-sdk-provider": "^3.0.0",
     "@prisma/client": "^7.9.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
+    "ai": "^7.0.66",
     "dotenv": "^17.4.2",
-    "hono": "^4.13.2"
+    "hono": "^4.13.2",
+    "pino": "^10.3.1",
+    "qrcode-terminal": "^0.12.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "@types/qrcode-terminal": "^0.12.2",
     "prisma": "^7.9.1",
     "supabase": "^2.114.0",
     "tsx": "^4.23.0",
