@@ -23,3 +23,6 @@ export {
   webSearch,
   fetchWebPage,
 } from './web-tools.js'
+export {
+  getCurrentDateTime,
+} from './time-tools.js'

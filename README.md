@@ -47,7 +47,8 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │       ├── task-tools.ts  # listTasks, getTask, createTask, updateTask, deleteCompletedTasks
 │   │       ├── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
 │   │       ├── sheet-tools.ts # saveSpreadsheet, listSpreadsheets, readSpreadsheet
-│   │       └── web-tools.ts   # webSearch, fetchWebPage ($0 live internet)
+│   │       ├── web-tools.ts   # webSearch, fetchWebPage ($0 live internet)
+│   │       └── time-tools.ts  # getCurrentDateTime (real-time live lookups)
 │   ├── services/
 │   │   └── whatsapp/
 │   │       ├── client.ts      # Baileys socket lifecycle + reconnection

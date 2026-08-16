@@ -21,6 +21,7 @@ import {
   readSpreadsheet,
   webSearch,
   fetchWebPage,
+  getCurrentDateTime,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -91,6 +92,7 @@ export async function processCommand(
         readSpreadsheet,
         webSearch,
         fetchWebPage,
+        getCurrentDateTime,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {
