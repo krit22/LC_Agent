@@ -46,6 +46,18 @@ This document defines the relational PostgreSQL schema for **LC_Agent** managed 
                                          │ source_message_id (Text) │
                                          │ created_at / updated_at  │
                                          └──────────────────────────┘
+
+                                         ┌──────────────────────────┐
+                                         │       spreadsheets       │
+                                         ├──────────────────────────┤
+                                         │ id (UUID, PK)            │
+                                         │ title (VarChar)          │
+                                         │ url (Text)               │
+                                         │ description (Text, Null) │
+                                         │ purpose (VarChar, Null)  │
+                                         │ metadata (JSONB)         │
+                                         │ created_at / updated_at  │
+                                         └──────────────────────────┘
 ```
 
 ---
@@ -112,6 +124,22 @@ Tracks both generic tasks and structured workflow tasks (e.g. Poster Making).
 | `source_message_id` | `VARCHAR(255)` | `NULLABLE` | Originating WhatsApp message ID |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | `@updatedAt, DEFAULT NOW()` | Update timestamp |
+
+---
+
+### Table: `spreadsheets`
+Registers external Google Sheets and Excel/CSV URLs with metadata, headers, and descriptions for agent querying and knowledge retrieval.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY, @default(uuid())` | Unique spreadsheet reference ID |
+| `title` | `VARCHAR(255)` | `NOT NULL` | Sheet title (e.g. "Club Membership 2026", "Freshers Recruitment Data") |
+| `url` | `TEXT` | `NOT NULL` | Full Google Sheets link or CSV URL |
+| `description` | `TEXT` | `NULLABLE` | Description of data contents |
+| `purpose` | `VARCHAR(255)` | `NULLABLE` | Target audience, domain, or club function |
+| `metadata` | `JSONB` | `DEFAULT '{}'` | Extracted headers, initial row counts, sample data |
+| `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Record creation timestamp |
+| `updated_at` | `TIMESTAMPTZ` | `@updatedAt, DEFAULT NOW()` | Record update timestamp |
 
 ---
 

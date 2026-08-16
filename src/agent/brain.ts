@@ -16,6 +16,9 @@ import {
   listDomains,
   createDomain,
   updateDomain,
+  saveSpreadsheet,
+  listSpreadsheets,
+  readSpreadsheet,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -81,6 +84,9 @@ export async function processCommand(
         listDomains,
         createDomain,
         updateDomain,
+        saveSpreadsheet,
+        listSpreadsheets,
+        readSpreadsheet,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {

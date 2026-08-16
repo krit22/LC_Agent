@@ -14,3 +14,8 @@ export {
   createDomain,
   updateDomain,
 } from './people-tools.js'
+export {
+  saveSpreadsheet,
+  listSpreadsheets,
+  readSpreadsheet,
+} from './sheet-tools.js'

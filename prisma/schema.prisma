@@ -69,6 +69,19 @@ model Task {
   @@map("tasks")
 }
 
+model Spreadsheet {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String   @db.VarChar(255)
+  url         String   @db.Text
+  description String?  @db.Text
+  purpose     String?  @db.VarChar(255) // e.g. "Club Membership 2026", "Event Registrations", "Budget"
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("spreadsheets")
+}
+
 model MessageAuditLog {
   id             String   @id @default(uuid()) @db.Uuid
   messageId      String   @unique @map("message_id") @db.VarChar(255)
