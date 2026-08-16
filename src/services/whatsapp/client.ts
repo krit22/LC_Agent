@@ -8,8 +8,9 @@ import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import qrcode from 'qrcode-terminal'
 
+// Silence internal Baileys protocol noise (e.g. SenderKey/decrypt retries on unmonitored historical messages)
 const logger = pino({
-  level: process.env.NODE_ENV === 'development' ? 'warn' : 'silent',
+  level: 'silent',
 })
 
 export let activeSock: ReturnType<typeof makeWASocket> | null = null
@@ -32,6 +33,9 @@ export async function createWhatsAppClient() {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
+    // Prevent sync history spam on connect
+    syncFullHistory: false,
+    markOnlineOnConnect: false,
   })
 
   activeSock = sock
