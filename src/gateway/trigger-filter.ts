@@ -23,26 +23,31 @@ export function isGroupChat(jid: string): boolean {
  * Check if an incoming message is eligible for processing based on chat type & sender permissions.
  *
  * Permission Invariants:
- * 1. Groups (@g.us): Responds to BOTH messages from the user (fromMe = true)
+ * 1. Whitelisted Chats: Any JID explicitly in ALLOWED_GROUP_JIDS is always allowed.
+ * 2. Groups (@g.us): Responds to BOTH messages from the user (fromMe = true)
  *    and other group participants (fromMe = false), subject to ALLOWED_GROUP_JIDS.
- * 2. Direct Messages (DMs / 1:1 chats): Responds ONLY to messages sent by the user (fromMe = true).
- *    Incoming DMs from other people (fromMe = false) are strictly ignored to prevent unauthorized access.
+ * 3. Direct Messages (DMs / 1:1 chats): Responds to self-sent messages (fromMe = true)
+ *    or explicitly whitelisted contact/LID chats.
  */
 export function isAllowedMessage(
   remoteJid: string,
   fromMe: boolean,
 ): boolean {
+  // If the chat is explicitly in the allowed list, permit it
+  if (config.allowedGroupJids.includes(remoteJid)) {
+    return true
+  }
+
   const isGroup = isGroupChat(remoteJid)
 
   if (isGroup) {
-    // In groups, allow both self and other members (subject to allowlist if set)
     if (config.allowedGroupJids.length === 0) {
       return true
     }
     return config.allowedGroupJids.includes(remoteJid)
   }
 
-  // In DMs (1:1 chats), ONLY process messages sent by the user (fromMe: true)
+  // In DMs (1:1 chats), process messages sent by self (fromMe: true)
   return fromMe
 }
 
