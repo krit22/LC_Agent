@@ -5,6 +5,7 @@ import { prisma } from '../../db/prisma.js'
 import {
   registerJobInScheduler,
   unregisterJobFromScheduler,
+  executeScheduledJob,
 } from '../../services/scheduler/scheduler.js'
 import {
   fetchAvailableChannels,
@@ -44,12 +45,12 @@ export const listAvailableChannels = tool({
  */
 export const createScheduledJob = tool({
   description:
-    'Create and schedule a recurring automated task, daily greeting, routine reminder, or autonomous workflow for a SPECIFIC channel. Always specify the target channel name or JID.',
+    'Create and schedule a recurring automated task, daily greeting, routine reminder, or autonomous workflow for a SPECIFIC channel. The prompt must be crafted with high precision as a direct self-contained instruction for the agent.',
   inputSchema: z.object({
     name: z
       .string()
       .describe(
-        'Descriptive name for the scheduled routine (e.g. "Daily Good Morning", "Sunday Weekly Review", "Task Deadline Checker").',
+        'Descriptive name for the scheduled routine (e.g. "Daily Spreadsheet Tracker", "Morning Briefing", "Sunday Task Review").',
       ),
     cronExpression: z
       .string()
@@ -59,13 +60,13 @@ export const createScheduledJob = tool({
     prompt: z
       .string()
       .describe(
-        'The prompt/instructions to execute automatically when the cron triggers (e.g. "Wish the group good morning with an inspiring quote.").',
+        'Precise, self-contained prompt/instructions to execute automatically when the cron triggers (e.g. "Query the Club Members spreadsheet, check for pending tasks, and post a concise 3-bullet team briefing.").',
       ),
     channelName: z
       .string()
       .optional()
       .describe(
-        'The human-readable name of the target group or channel (e.g. "Core Team", "Graphic Design", "Literary Circle").',
+        'The human-readable name of the target group or channel (e.g. "Core Team", "Graphic Design", "Ritu Vishwakarma").',
       ),
     targetJid: z
       .string()
@@ -157,6 +158,66 @@ export const createScheduledJob = tool({
       return {
         error: `Failed to create scheduled job: ${msg}`,
       }
+    }
+  },
+})
+
+/**
+ * Tool: triggerScheduledJob
+ * Manually executes and tests a scheduled routine immediately on demand.
+ */
+export const triggerScheduledJob = tool({
+  description:
+    'Manually trigger and test a scheduled routine immediately on demand without waiting for its scheduled cron time. Runs the full autonomous workflow and delivers the message to the target channel.',
+  inputSchema: z.object({
+    jobId: z.string().uuid().optional().describe('UUID of the scheduled job to test.'),
+    nameSearch: z
+      .string()
+      .optional()
+      .describe('Name search to find the scheduled job to test (e.g. "Good Morning", "Spreadsheet Tracker").'),
+  }),
+  execute: async ({ jobId, nameSearch }) => {
+    try {
+      if (!jobId && !nameSearch) {
+        return { error: 'Please provide either a jobId or nameSearch.' }
+      }
+
+      const where: any = {}
+      if (jobId) where.id = jobId
+      if (nameSearch) {
+        where.name = { contains: nameSearch, mode: 'insensitive' }
+      }
+
+      const job = await prisma.scheduledJob.findFirst({ where })
+      if (!job) {
+        return { error: `Scheduled routine "${nameSearch || jobId}" not found.` }
+      }
+
+      const channels = await fetchAvailableChannels()
+      const channel = channels.find((c) => c.id === job.targetJid)
+      const channelName = channel ? channel.name : job.targetJid
+
+      // Execute routine immediately
+      const execResult = await executeScheduledJob(job.id)
+
+      if (!execResult.success) {
+        return {
+          error: `Failed to execute routine "${job.name}": ${execResult.error}`,
+        }
+      }
+
+      return {
+        jobId: job.id,
+        jobName: job.name,
+        targetChannel: channelName,
+        targetJid: job.targetJid,
+        promptExecuted: job.prompt,
+        outputDelivered: execResult.output,
+        message: `Successfully triggered and executed routine "${job.name}" on demand for "${channelName}".`,
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      return { error: `Failed to trigger routine: ${msg}` }
     }
   },
 })

@@ -18,17 +18,28 @@ export function setSchedulerMessageSender(
 }
 
 /**
- * Execute a scheduled autonomous job.
+ * Execute a scheduled autonomous job (can be triggered by cron or on-demand).
  */
-export async function executeScheduledJob(jobId: string) {
+export async function executeScheduledJob(jobId: string): Promise<{
+  success: boolean
+  jobName: string
+  targetJid: string
+  output: string
+  error?: string
+}> {
   try {
     const job = await prisma.scheduledJob.findUnique({
       where: { id: jobId },
     })
 
-    if (!job || job.status !== 'ACTIVE') {
-      console.log(`⏰ [Scheduler] Skipping inactive or deleted job: ${jobId}`)
-      return
+    if (!job) {
+      return {
+        success: false,
+        jobName: 'Unknown',
+        targetJid: '',
+        output: '',
+        error: `Job ID ${jobId} not found.`,
+      }
     }
 
     console.log(`\n⏰ [Scheduler Triggered] Routine: "${job.name}"`)
@@ -43,10 +54,12 @@ export async function executeScheduledJob(jobId: string) {
       'Autonomous Routine',
     )
 
+    const deliveryText = `⏰ *[Automated Routine: ${job.name}]*\n\n${result.responseText}`
+
     // 2. Deliver generated message to WhatsApp target
     if (messageSender && result.responseText) {
       try {
-        await messageSender(job.targetJid, result.responseText)
+        await messageSender(job.targetJid, deliveryText)
         console.log(`📤 [Scheduler Outgoing] Delivered "${job.name}" to ${job.targetJid}`)
       } catch (sendErr) {
         console.error(
@@ -65,8 +78,23 @@ export async function executeScheduledJob(jobId: string) {
       where: { id: jobId },
       data: { lastRunAt: new Date() },
     })
+
+    return {
+      success: true,
+      jobName: job.name,
+      targetJid: job.targetJid,
+      output: deliveryText,
+    }
   } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
     console.error(`❌ [Scheduler Execution Error] Job ID ${jobId}:`, err)
+    return {
+      success: false,
+      jobName: 'Error',
+      targetJid: '',
+      output: '',
+      error: msg,
+    }
   }
 }
 

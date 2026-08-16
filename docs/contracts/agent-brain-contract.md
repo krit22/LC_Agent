@@ -18,11 +18,13 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 1. **Zero Technical/SQL Jargon in Outputs**: The agent must NEVER output raw SQL, table definitions, or database queries in user-facing WhatsApp messages. Responses must be concise, natural, and human-friendly.
 2. **Extreme Brevity**: All WhatsApp replies must be short, clear, and direct (1 to 4 lines maximum).
 3. **Target Channel Precision**: Scheduled cron jobs run strictly in ONE specific channel. The agent must never broadcast to all groups. If no channel is specified, it must prompt the user with available channels.
-4. **Dynamic Real-Time Temporal Grounding**: The agent must never assume or hallucinate dates. When scheduling deadlines or interpreting relative dates ("tomorrow", "in 3 days", "this Friday"), it calls `getCurrentDateTime` to retrieve the live calendar state.
-5. **Completed Task Deletion Boundary**: The agent has the ability to delete tasks via `deleteCompletedTasks`, but **only** for tasks that have reached `status === 'COMPLETED'`. Ongoing/active tasks cannot be deleted.
-6. **Structured & Autonomous Tools**: The agent operates through 22 typed Prisma, spreadsheet, time, web, channel, and scheduled routine tools.
-7. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
-8. **Schema Validation**: All tool inputs are validated via Zod schemas before executing operations.
+4. **Autonomous Self-Contained Prompt Crafting**: The agent crafts the cron `prompt` as a complete, self-contained instruction for itself (identifying the specific tools to call and formatting required).
+5. **On-Demand Testing**: The agent provides `triggerScheduledJob` to immediately execute and verify any routine on demand without waiting for its scheduled time.
+6. **Dynamic Real-Time Temporal Grounding**: The agent must never assume or hallucinate dates. When scheduling deadlines or interpreting relative dates ("tomorrow", "in 3 days", "this Friday"), it calls `getCurrentDateTime` to retrieve the live calendar state.
+7. **Completed Task Deletion Boundary**: The agent has the ability to delete tasks via `deleteCompletedTasks`, but **only** for tasks that have reached `status === 'COMPLETED'`. Ongoing/active tasks cannot be deleted.
+8. **Structured & Autonomous Tools**: The agent operates through 23 typed Prisma, spreadsheet, time, web, channel, and scheduled routine tools.
+9. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
+10. **Schema Validation**: All tool inputs are validated via Zod schemas before executing operations.
 
 ---
 
@@ -37,6 +39,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `createScheduledJob` | `{ name, cronExpression, prompt, channelName?, targetJid?, timezone? }` | `prisma.scheduledJob.create()` + in-process `Cron` registration | Scheduled job info with target channel and next run in IST |
+| `triggerScheduledJob` | `{ jobId?, nameSearch? }` | Executes autonomous job immediately on demand + delivers to chat | Execution details, target channel, output delivered |
 | `listScheduledJobs` | `{ status? }` | `prisma.scheduledJob.findMany()` | Routine[] with next run dates & target channels |
 | `updateScheduledJob` | `{ jobId?, nameSearch?, cronExpression?, prompt?, channelName?, status? }` | `prisma.scheduledJob.update()` + scheduler sync | Updated routine info |
 | `deleteScheduledJob` | `{ jobId?, nameSearch? }` | `prisma.scheduledJob.delete()` + scheduler unregister | Deletion confirmation |
@@ -87,10 +90,11 @@ The system prompt (`src/agent/prompts.ts`) defines:
 1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
 2. **Response Style**: Ultra-short, compact bullet points, no pleasantries, zero technical/SQL jargon.
 3. **Autonomous Routines**: Translates natural language schedules into standard 5-part cron syntax in IST, targeted to specific channels.
-4. **Channel Selection**: Queries `listAvailableChannels` to resolve group names and asks the user when no channel is specified.
-5. **Temporal Awareness**: Calls `getCurrentDateTime` whenever calculating relative deadlines or checking the current day.
-6. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
-7. **Knowledge Retrieval**: Able to search live web data ($0 cost) and inspect Google Sheets via link.
+4. **Precise Prompt Crafting**: Self-contained instructions specifying tools and output format for autonomous runs.
+5. **On-Demand Execution**: Direct testing of routines via `triggerScheduledJob`.
+6. **Channel Selection**: Queries `listAvailableChannels` to resolve group names and asks the user when no channel is specified.
+7. **Temporal Awareness**: Calls `getCurrentDateTime` whenever calculating relative deadlines or checking the current day.
+8. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
 
 ---
 
@@ -99,8 +103,8 @@ The system prompt (`src/agent/prompts.ts`) defines:
 | File | Responsibility |
 | :--- | :--- |
 | `src/agent/brain.ts` | Core orchestrator: `generateText()` with database, sheet, web, time, channel, and cron tools |
-| `src/agent/tools/index.ts` | Tool registry exporting all 22 tools |
-| `src/agent/tools/cron-tools.ts` | Autonomous routines & cron management, channel listing |
+| `src/agent/tools/index.ts` | Tool registry exporting all 23 tools |
+| `src/agent/tools/cron-tools.ts` | Autonomous routines & cron management, channel listing, on-demand trigger |
 | `src/services/whatsapp/channels.ts` | WhatsApp group & direct chat metadata discovery and name resolution |
 | `src/services/scheduler/scheduler.ts` | In-process Cron scheduler engine with PostgreSQL persistence |
 | `src/agent/tools/time-tools.ts` | Real-time live date, time, and relative calendar lookups in IST |

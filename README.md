@@ -49,7 +49,7 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │       ├── sheet-tools.ts # saveSpreadsheet, listSpreadsheets, readSpreadsheet
 │   │       ├── web-tools.ts   # webSearch, fetchWebPage ($0 live internet)
 │   │       ├── time-tools.ts  # getCurrentDateTime (real-time live lookups)
-│   │       └── cron-tools.ts  # createScheduledJob, listScheduledJobs, updateScheduledJob, deleteScheduledJob
+│   │       └── cron-tools.ts  # createScheduledJob, triggerScheduledJob, listScheduledJobs, updateScheduledJob, deleteScheduledJob, listAvailableChannels
 │   ├── services/
 │   │   ├── scheduler/
 │   │   │   └── scheduler.ts   # In-process Cron scheduler engine + PostgreSQL sync

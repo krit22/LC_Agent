@@ -28,6 +28,7 @@ export {
 } from './time-tools.js'
 export {
   createScheduledJob,
+  triggerScheduledJob,
   listScheduledJobs,
   updateScheduledJob,
   deleteScheduledJob,
