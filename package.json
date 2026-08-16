@@ -28,6 +28,7 @@
     "@prisma/client": "^7.9.1",
     "@whiskeysockets/baileys": "^7.0.0-rc14",
     "ai": "^7.0.66",
+    "croner": "^10.0.1",
     "dotenv": "^17.4.2",
     "hono": "^4.13.2",
     "pg": "^8.23.0",

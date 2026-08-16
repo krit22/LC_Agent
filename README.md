@@ -48,8 +48,11 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │       ├── people-tools.ts  # listPeople, getPerson, createPerson, updatePerson, listDomains, createDomain, updateDomain
 │   │       ├── sheet-tools.ts # saveSpreadsheet, listSpreadsheets, readSpreadsheet
 │   │       ├── web-tools.ts   # webSearch, fetchWebPage ($0 live internet)
-│   │       └── time-tools.ts  # getCurrentDateTime (real-time live lookups)
+│   │       ├── time-tools.ts  # getCurrentDateTime (real-time live lookups)
+│   │       └── cron-tools.ts  # createScheduledJob, listScheduledJobs, updateScheduledJob, deleteScheduledJob
 │   ├── services/
+│   │   ├── scheduler/
+│   │   │   └── scheduler.ts   # In-process Cron scheduler engine + PostgreSQL sync
 │   │   └── whatsapp/
 │   │       ├── client.ts      # Baileys socket lifecycle + reconnection
 │   │       ├── listener.ts    # Event dispatcher → gateway → agent → responder

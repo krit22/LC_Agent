@@ -82,6 +82,22 @@ model Spreadsheet {
   @@map("spreadsheets")
 }
 
+model ScheduledJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @db.VarChar(255)
+  cronExpression String    @map("cron_expression") @db.VarChar(100) // e.g. "0 8 * * *"
+  timezone       String    @default("Asia/Kolkata") @db.VarChar(50)
+  targetJid      String    @map("target_jid") @db.VarChar(100)      // Target WhatsApp group or chat JID
+  prompt         String    @db.Text                                // Action prompt dispatched to Agent Brain
+  status         String    @default("ACTIVE") @db.VarChar(50)       // "ACTIVE" | "PAUSED"
+  lastRunAt      DateTime? @map("last_run_at") @db.Timestamptz()
+  metadata       Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("scheduled_jobs")
+}
+
 model MessageAuditLog {
   id             String   @id @default(uuid()) @db.Uuid
   messageId      String   @unique @map("message_id") @db.VarChar(255)

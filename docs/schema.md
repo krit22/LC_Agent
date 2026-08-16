@@ -58,6 +58,21 @@ This document defines the relational PostgreSQL schema for **LC_Agent** managed 
                                          │ metadata (JSONB)         │
                                          │ created_at / updated_at  │
                                          └──────────────────────────┘
+
+                                         ┌──────────────────────────┐
+                                         │      scheduled_jobs      │
+                                         ├──────────────────────────┤
+                                         │ id (UUID, PK)            │
+                                         │ name (VarChar)           │
+                                         │ cron_expression (VarChar)│ (e.g. "0 8 * * *")
+                                         │ timezone (VarChar)       │ (Asia/Kolkata)
+                                         │ target_jid (VarChar)     │ (Target WhatsApp Group)
+                                         │ prompt (Text)            │ (Autonomous instructions)
+                                         │ status (VarChar)         │ ("ACTIVE" | "PAUSED")
+                                         │ last_run_at (Timestamp)  │
+                                         │ metadata (JSONB)         │
+                                         │ created_at / updated_at  │
+                                         └──────────────────────────┘
 ```
 
 ---
@@ -140,6 +155,25 @@ Registers external Google Sheets and Excel/CSV URLs with metadata, headers, and 
 | `metadata` | `JSONB` | `DEFAULT '{}'` | Extracted headers, initial row counts, sample data |
 | `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Record creation timestamp |
 | `updated_at` | `TIMESTAMPTZ` | `@updatedAt, DEFAULT NOW()` | Record update timestamp |
+
+---
+
+### Table: `scheduled_jobs`
+Stores autonomous cron routines and scheduled workflows with targets and execution prompts.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY, @default(uuid())` | Scheduled job ID |
+| `name` | `VARCHAR(255)` | `NOT NULL` | Job title (e.g. "Daily Good Morning", "Sunday Task Review") |
+| `cron_expression` | `VARCHAR(100)` | `NOT NULL` | Standard 5-part cron syntax (e.g. `0 8 * * *`) |
+| `timezone` | `VARCHAR(50)` | `DEFAULT 'Asia/Kolkata'` | Timezone of execution |
+| `target_jid` | `VARCHAR(100)` | `NOT NULL` | Target WhatsApp group or DM chat JID |
+| `prompt` | `TEXT` | `NOT NULL` | Autonomous prompt given to agent brain on trigger |
+| `status` | `VARCHAR(50)` | `DEFAULT 'ACTIVE'` | `ACTIVE` or `PAUSED` |
+| `last_run_at` | `TIMESTAMPTZ` | `NULLABLE` | Timestamp of most recent execution |
+| `metadata` | `JSONB` | `DEFAULT '{}'` | Additional settings |
+| `created_at` | `TIMESTAMPTZ` | `DEFAULT NOW()` | Creation timestamp |
+| `updated_at` | `TIMESTAMPTZ` | `@updatedAt, DEFAULT NOW()` | Update timestamp |
 
 ---
 

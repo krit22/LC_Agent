@@ -22,6 +22,10 @@ import {
   webSearch,
   fetchWebPage,
   getCurrentDateTime,
+  createScheduledJob,
+  listScheduledJobs,
+  updateScheduledJob,
+  deleteScheduledJob,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -93,6 +97,10 @@ export async function processCommand(
         webSearch,
         fetchWebPage,
         getCurrentDateTime,
+        createScheduledJob,
+        listScheduledJobs,
+        updateScheduledJob,
+        deleteScheduledJob,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {

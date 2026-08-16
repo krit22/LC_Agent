@@ -19,7 +19,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 2. **Extreme Brevity**: All WhatsApp replies must be short, clear, and direct (1 to 4 lines maximum).
 3. **Dynamic Real-Time Temporal Grounding**: The agent must never assume or hallucinate dates. When scheduling deadlines or interpreting relative dates ("tomorrow", "in 3 days", "this Friday"), it calls `getCurrentDateTime` to retrieve the live calendar state.
 4. **Completed Task Deletion Boundary**: The agent has the ability to delete tasks via `deleteCompletedTasks`, but **only** for tasks that have reached `status === 'COMPLETED'`. Ongoing/active tasks cannot be deleted.
-5. **Structured & Free Web Tools**: The agent operates through 17 typed Prisma, spreadsheet, time, and free web inspection tools.
+5. **Structured & Autonomous Tools**: The agent operates through 21 typed Prisma, spreadsheet, time, web, and scheduled routine tools.
 6. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
 7. **Schema Validation**: All tool inputs are validated via Zod schemas before executing operations.
 
@@ -27,12 +27,20 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 
 ## 3. Tool Registry
 
-### A. Real-Time Date & Time Tools (`src/agent/tools/time-tools.ts`)
+### A. Autonomous Routines & Cron Tools (`src/agent/tools/cron-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
-| `getCurrentDateTime` | `{ timezone? }` | Real-time `Intl.DateTimeFormat` live calendar lookup | Current date, time, weekday, ISO timestamp, today & tomorrow calendar dates |
+| `createScheduledJob` | `{ name, cronExpression, prompt, targetJid?, timezone? }` | `prisma.scheduledJob.create()` + in-process `Cron` registration | Scheduled job info with next run in IST |
+| `listScheduledJobs` | `{ status? }` | `prisma.scheduledJob.findMany()` | Routine[] with next run dates |
+| `updateScheduledJob` | `{ jobId?, nameSearch?, cronExpression?, prompt?, status? }` | `prisma.scheduledJob.update()` + scheduler sync | Updated routine info |
+| `deleteScheduledJob` | `{ jobId?, nameSearch? }` | `prisma.scheduledJob.delete()` + scheduler unregister | Deletion confirmation |
 
-### B. Task & Workflow Tools (`src/agent/tools/task-tools.ts`)
+### B. Real-Time Date & Time Tools (`src/agent/tools/time-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
+| :--- | :--- | :--- | :--- |
+| `getCurrentDateTime` | `{ timezone? }` | Real-time `Intl.DateTimeFormat` live calendar lookup | Current date, time, weekday, ISO timestamp, today & tomorrow calendar dates in IST |
+
+### C. Task & Workflow Tools (`src/agent/tools/task-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `listTasks` | `{ personName?, domainCode?, status?, priority? }` | `prisma.task.findMany()` | Task[] with assignee & domain |
@@ -41,7 +49,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | `updateTask` | `{ taskId, status?, priority?, feedback?, assigneeName?, description? }` | `prisma.task.update()` | Updated task record |
 | `deleteCompletedTasks` | `{ taskId?, titleSearch?, deleteAll?, domainCode? }` | `prisma.task.delete()` / `deleteMany({ where: { status: 'COMPLETED' } })` | Deletion count / detail |
 
-### C. Member & Domain Directory Tools (`src/agent/tools/people-tools.ts`)
+### D. Member & Domain Directory Tools (`src/agent/tools/people-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `listPeople` | `{ name?, year?, domainCode? }` | `prisma.person.findMany()` | Person[] with domains |
@@ -52,14 +60,14 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | `createDomain` | `{ name, code, description? }` | `prisma.domain.create()` | Created domain record |
 | `updateDomain` | `{ domainCode, name?, description? }` | `prisma.domain.update()` | Updated domain record |
 
-### D. Google Sheets & External Knowledge Tools (`src/agent/tools/sheet-tools.ts`)
+### E. Google Sheets & External Knowledge Tools (`src/agent/tools/sheet-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `saveSpreadsheet` | `{ title, url, description?, purpose? }` | `prisma.spreadsheet.upsert()` + live header extraction | Saved sheet record with metadata |
 | `listSpreadsheets` | `{ query? }` | `prisma.spreadsheet.findMany()` | Registered sheet[] with columns & rows |
 | `readSpreadsheet` | `{ url?, titleSearch?, spreadsheetId?, query?, limit?, offset?, summaryOnly? }` | Live fetch & CSV parse + cell search/slice | Sheet title, headers, matching rows |
 
-### E. Free Live Internet & Web Tools (`src/agent/tools/web-tools.ts`)
+### F. Free Live Internet & Web Tools (`src/agent/tools/web-tools.ts`)
 | Tool | Input Schema | Operation | Returns |
 | :--- | :--- | :--- | :--- |
 | `webSearch` | `{ query, limit? }` | Free DuckDuckGo HTML scraper + Wikipedia fallback | Ranked search results (title, snippet, URL) |
@@ -72,28 +80,22 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 The system prompt (`src/agent/prompts.ts`) defines:
 1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
 2. **Response Style**: Ultra-short, compact bullet points, no pleasantries, zero technical/SQL jargon.
-3. **Temporal Awareness**: Must call `getCurrentDateTime` whenever calculating relative deadlines or checking the current day.
-4. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
-5. **Knowledge Retrieval**: Able to search live web data ($0 cost) and inspect Google Sheets via link.
-6. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
+3. **Autonomous Routines**: Translates natural language schedules into standard 5-part cron syntax in IST.
+4. **Temporal Awareness**: Calls `getCurrentDateTime` whenever calculating relative deadlines or checking the current day.
+5. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
+6. **Knowledge Retrieval**: Able to search live web data ($0 cost) and inspect Google Sheets via link.
 
 ---
 
-## 5. Conversation Context Rules
-
-- Short-term memory via in-memory sliding window (15 messages, 30-min TTL).
-- Context is per-group, including message metadata (`[Chat: <groupJid>] [SenderName]: <command>`).
-- Context is reset on server restart (no persistent leakage).
-
----
-
-## 6. Implementation Map
+## 5. Implementation Map
 
 | File | Responsibility |
 | :--- | :--- |
-| `src/agent/brain.ts` | Core orchestrator: `generateText()` with database, sheet, web, and time tools |
-| `src/agent/tools/index.ts` | Tool registry exporting all 17 tools |
-| `src/agent/tools/time-tools.ts` | Real-time live date, time, and relative calendar lookups |
+| `src/agent/brain.ts` | Core orchestrator: `generateText()` with database, sheet, web, time, and cron tools |
+| `src/agent/tools/index.ts` | Tool registry exporting all 21 tools |
+| `src/agent/tools/cron-tools.ts` | Autonomous routines & cron management |
+| `src/services/scheduler/scheduler.ts` | In-process Cron scheduler engine with PostgreSQL persistence |
+| `src/agent/tools/time-tools.ts` | Real-time live date, time, and relative calendar lookups in IST |
 | `src/agent/tools/task-tools.ts` | Task CRUD, workflow transitions, and completed task deletion |
 | `src/agent/tools/people-tools.ts` | Member & domain management |
 | `src/agent/tools/sheet-tools.ts` | Google Sheets ingestion, storage, and live querying |
