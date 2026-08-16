@@ -1,4 +1,5 @@
 import { config } from '../../config.js'
+import { prisma } from '../../db/prisma.js'
 
 export interface ChannelInfo {
   id: string
@@ -6,8 +7,9 @@ export interface ChannelInfo {
   type: 'group' | 'direct'
 }
 
-// In-memory cache of resolved group names
+// In-memory cache of resolved group & contact names
 const groupNameCache = new Map<string, string>()
+const contactNameCache = new Map<string, string>()
 
 // Delegate for fetching live group metadata from WhatsApp socket
 let groupMetadataFetcher:
@@ -18,6 +20,15 @@ export function setGroupMetadataFetcher(
   fetcher: (jid: string) => Promise<{ subject?: string } | null>,
 ) {
   groupMetadataFetcher = fetcher
+}
+
+/**
+ * Records a contact's push name or sender name when a message is received.
+ */
+export function recordContactName(jid: string, name: string) {
+  if (name && name !== 'Unknown' && name !== 'WhatsApp User') {
+    contactNameCache.set(jid, name)
+  }
 }
 
 /**
@@ -39,7 +50,7 @@ export async function fetchAvailableChannels(): Promise<ChannelInfo[]> {
             groupNameCache.set(jid, groupName)
           }
         } catch {
-          // Socket metadata call fallback if socket is offline or rate-limited
+          // Socket metadata call fallback
         }
       }
 
@@ -49,9 +60,27 @@ export async function fetchAvailableChannels(): Promise<ChannelInfo[]> {
         type: 'group',
       })
     } else {
+      // 1:1 Direct Chat or LID
+      let contactName = contactNameCache.get(jid)
+
+      // Try database lookup in people table
+      if (!contactName) {
+        try {
+          const person = await prisma.person.findFirst({
+            where: { phoneJid: jid },
+          })
+          if (person) {
+            contactName = `${person.name} (${person.role})`
+            contactNameCache.set(jid, contactName)
+          }
+        } catch {}
+      }
+
       channels.push({
         id: jid,
-        name: `Direct / Private Chat (${jid.split('@')[0]})`,
+        name: contactName
+          ? `Personal DM: ${contactName}`
+          : `Direct Chat (${jid.split('@')[0]})`,
         type: 'direct',
       })
     }

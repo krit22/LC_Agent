@@ -7,6 +7,7 @@ import {
 } from '../../gateway/trigger-filter.js'
 import { processCommand } from '../../agent/brain.js'
 import { reactToMessage, sendReply, setTyping, clearTyping } from './responder.js'
+import { recordContactName } from './channels.js'
 import { prisma } from '../../db/prisma.js'
 
 /**
@@ -38,6 +39,10 @@ async function handleMessage(sock: WASocket, msg: WAMessage): Promise<void> {
   // Step 1: Normalize the raw message (passes sock to resolve self JID/name)
   const normalized = normalizeMessage(msg, sock)
   if (!normalized) return
+
+  // Record contact display name for channel discovery
+  recordContactName(normalized.senderJid, normalized.senderName)
+  recordContactName(normalized.groupJid, normalized.senderName)
 
   const isGroup = isGroupChat(normalized.groupJid)
   const isSelf = normalized.fromMe && normalized.senderJid.split('@')[0] === normalized.groupJid.split('@')[0]
