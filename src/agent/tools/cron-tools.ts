@@ -6,14 +6,45 @@ import {
   registerJobInScheduler,
   unregisterJobFromScheduler,
 } from '../../services/scheduler/scheduler.js'
+import {
+  fetchAvailableChannels,
+  resolveChannel,
+} from '../../services/whatsapp/channels.js'
+
+/**
+ * Tool: listAvailableChannels
+ * Lists all WhatsApp groups and direct chats the agent has access to.
+ */
+export const listAvailableChannels = tool({
+  description:
+    'List all WhatsApp group channels and direct chats the agent has access to, including their human-readable names and IDs. Use this to see which groups are available or to help the user pick a target channel.',
+  inputSchema: z.object({}),
+  execute: async () => {
+    try {
+      const channels = await fetchAvailableChannels()
+      return {
+        totalChannels: channels.length,
+        channels: channels.map((c, idx) => ({
+          number: idx + 1,
+          name: c.name,
+          id: c.id,
+          type: c.type,
+        })),
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      return { error: `Failed to list channels: ${msg}` }
+    }
+  },
+})
 
 /**
  * Tool: createScheduledJob
- * Schedules a recurring automated workflow or reminder.
+ * Schedules a recurring automated workflow or reminder targeting a specific channel.
  */
 export const createScheduledJob = tool({
   description:
-    'Create and schedule a recurring automated task, daily greeting, routine reminder, or autonomous workflow using cron syntax (e.g. "0 8 * * *" for daily at 8 AM). Automatically registers in the database and runs continuously in Indian Standard Time (IST).',
+    'Create and schedule a recurring automated task, daily greeting, routine reminder, or autonomous workflow for a SPECIFIC channel. Always specify the target channel name or JID.',
   inputSchema: z.object({
     name: z
       .string()
@@ -28,14 +59,18 @@ export const createScheduledJob = tool({
     prompt: z
       .string()
       .describe(
-        'The prompt/instructions to execute automatically when the cron triggers (e.g. "Wish the group good morning with an inspiring 2-line quote from classic literature.").',
+        'The prompt/instructions to execute automatically when the cron triggers (e.g. "Wish the group good morning with an inspiring quote.").',
+      ),
+    channelName: z
+      .string()
+      .optional()
+      .describe(
+        'The human-readable name of the target group or channel (e.g. "Core Team", "Graphic Design", "Literary Circle").',
       ),
     targetJid: z
       .string()
       .optional()
-      .describe(
-        'WhatsApp group JID or chat JID where the result should be sent. If omitted, defaults to the active group chat.',
-      ),
+      .describe('Direct WhatsApp group JID (e.g. "120363407152492445@g.us").'),
     timezone: z
       .string()
       .default('Asia/Kolkata')
@@ -45,6 +80,7 @@ export const createScheduledJob = tool({
     name,
     cronExpression,
     prompt,
+    channelName,
     targetJid,
     timezone = 'Asia/Kolkata',
   }) => {
@@ -59,21 +95,44 @@ export const createScheduledJob = tool({
         }
       }
 
-      const finalTargetJid = targetJid || '120363407152492445@g.us'
+      // 2. Resolve target channel
+      let resolvedJid = targetJid
+      let resolvedName = channelName || 'Selected Channel'
 
-      // 2. Save in database
+      if (!resolvedJid && channelName) {
+        const found = await resolveChannel(channelName)
+        if (found) {
+          resolvedJid = found.id
+          resolvedName = found.name
+        }
+      }
+
+      if (!resolvedJid) {
+        const available = await fetchAvailableChannels()
+        return {
+          error:
+            'Target channel not specified or could not be found. Please specify which channel/group to send this routine in.',
+          availableChannels: available.map((c, idx) => ({
+            number: idx + 1,
+            name: c.name,
+            id: c.id,
+          })),
+        }
+      }
+
+      // 3. Save in database
       const created = await prisma.scheduledJob.create({
         data: {
           name,
           cronExpression,
           prompt,
-          targetJid: finalTargetJid,
+          targetJid: resolvedJid,
           timezone,
           status: 'ACTIVE',
         },
       })
 
-      // 3. Register in scheduler
+      // 4. Register in in-process scheduler
       registerJobInScheduler(created)
 
       const testCron = new Cron(cronExpression, { timezone })
@@ -84,13 +143,14 @@ export const createScheduledJob = tool({
         name: created.name,
         cronExpression: created.cronExpression,
         prompt: created.prompt,
+        targetChannel: resolvedName,
         targetJid: created.targetJid,
         timezone: created.timezone,
         status: created.status,
         nextRunIST: nextRun
           ? nextRun.toLocaleString('en-IN', { timeZone: timezone })
           : 'Unknown',
-        message: `Successfully created and scheduled routine "${created.name}" (${created.cronExpression}) in ${created.timezone}.`,
+        message: `Successfully scheduled routine "${created.name}" for channel "${resolvedName}" (${created.cronExpression}) in ${created.timezone}.`,
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Unknown error'
@@ -123,6 +183,9 @@ export const listScheduledJobs = tool({
       orderBy: { createdAt: 'desc' },
     })
 
+    const channels = await fetchAvailableChannels()
+    const channelMap = new Map(channels.map((c) => [c.id, c.name]))
+
     return jobs.map((j) => {
       let nextRunStr = 'N/A'
       if (j.status === 'ACTIVE') {
@@ -145,6 +208,7 @@ export const listScheduledJobs = tool({
         cron: j.cronExpression,
         status: j.status,
         prompt: j.prompt,
+        targetChannel: channelMap.get(j.targetJid) || j.targetJid,
         targetJid: j.targetJid,
         nextRun: nextRunStr,
         lastRunAt: j.lastRunAt ? j.lastRunAt.toISOString() : 'Never',
@@ -171,6 +235,10 @@ export const updateScheduledJob = tool({
       .optional()
       .describe('New cron expression (e.g. "0 9 * * *").'),
     prompt: z.string().optional().describe('Updated prompt/instructions.'),
+    channelName: z
+      .string()
+      .optional()
+      .describe('New target group or channel name.'),
     status: z
       .enum(['ACTIVE', 'PAUSED'])
       .optional()
@@ -181,6 +249,7 @@ export const updateScheduledJob = tool({
     nameSearch,
     cronExpression,
     prompt,
+    channelName,
     status,
   }) => {
     try {
@@ -210,6 +279,12 @@ export const updateScheduledJob = tool({
       }
       if (prompt) dataToUpdate.prompt = prompt
       if (status) dataToUpdate.status = status
+      if (channelName) {
+        const found = await resolveChannel(channelName)
+        if (found) {
+          dataToUpdate.targetJid = found.id
+        }
+      }
 
       const updated = await prisma.scheduledJob.update({
         where: { id: job.id },
@@ -228,6 +303,7 @@ export const updateScheduledJob = tool({
         cronExpression: updated.cronExpression,
         status: updated.status,
         prompt: updated.prompt,
+        targetJid: updated.targetJid,
         message: `Successfully updated routine "${updated.name}". Status: ${updated.status}.`,
       }
     } catch (err) {

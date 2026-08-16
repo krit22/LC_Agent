@@ -7,6 +7,7 @@ import {
   initScheduler,
   setSchedulerMessageSender,
 } from './services/scheduler/scheduler.js'
+import { setGroupMetadataFetcher } from './services/whatsapp/channels.js'
 
 const app = createApp()
 
@@ -38,6 +39,15 @@ async function bootServices() {
     // 3. Connect scheduler delivery to WhatsApp socket
     setSchedulerMessageSender(async (targetJid, text) => {
       await sock.sendMessage(targetJid, { text })
+    })
+
+    // 4. Connect group metadata discovery to WhatsApp socket
+    setGroupMetadataFetcher(async (jid) => {
+      try {
+        return await sock.groupMetadata(jid)
+      } catch {
+        return null
+      }
     })
 
     console.log('[Boot] WhatsApp client initialized. Waiting for connection...')

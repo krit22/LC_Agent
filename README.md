@@ -56,7 +56,8 @@ Welcome to the AI Agent Brain repository for The Literary Circle Club.
 │   │   └── whatsapp/
 │   │       ├── client.ts      # Baileys socket lifecycle + reconnection
 │   │       ├── listener.ts    # Event dispatcher → gateway → agent → responder
-│   │       └── responder.ts   # Send replies, reactions, presence updates
+│   │       ├── responder.ts   # Send replies, reactions, presence updates
+│   │       └── channels.ts    # Group & direct chat discovery and name resolution
 │   └── routes/
 │       ├── api.ts             # Core API endpoints
 │       └── health.ts          # Health check endpoint (/health)

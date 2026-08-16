@@ -31,4 +31,5 @@ export {
   listScheduledJobs,
   updateScheduledJob,
   deleteScheduledJob,
+  listAvailableChannels,
 } from './cron-tools.js'

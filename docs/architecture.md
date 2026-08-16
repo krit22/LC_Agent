@@ -47,7 +47,8 @@ This document describes the high-level architecture, subsystem boundaries, data 
 │  LAYER 4 — Agent Brain (LLM + Tool Calling)                     │
 │  src/agent/brain.ts + tools/*.ts + prompts.ts                    │
 │  • Vercel AI SDK generateText() with OpenRouter provider         │
-│  • 21 Specialized Tools:                                         │
+│  • 22 Specialized Tools:                                         │
+│    - Channels: listAvailableChannels                             │
 │    - Autonomous Cron: createScheduledJob, listScheduledJobs,     │
 │      updateScheduledJob, deleteScheduledJob                      │
 │    - Time & Calendar: getCurrentDateTime (real-time live lookups)│

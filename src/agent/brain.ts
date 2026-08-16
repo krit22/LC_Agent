@@ -26,6 +26,7 @@ import {
   listScheduledJobs,
   updateScheduledJob,
   deleteScheduledJob,
+  listAvailableChannels,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -101,6 +102,7 @@ export async function processCommand(
         listScheduledJobs,
         updateScheduledJob,
         deleteScheduledJob,
+        listAvailableChannels,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {
