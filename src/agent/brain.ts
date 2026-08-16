@@ -19,6 +19,8 @@ import {
   saveSpreadsheet,
   listSpreadsheets,
   readSpreadsheet,
+  webSearch,
+  fetchWebPage,
 } from './tools/index.js'
 
 const openrouter = createOpenRouter({
@@ -87,6 +89,8 @@ export async function processCommand(
         saveSpreadsheet,
         listSpreadsheets,
         readSpreadsheet,
+        webSearch,
+        fetchWebPage,
       },
       stopWhen: isStepCount(5),
       onStepFinish: (step) => {

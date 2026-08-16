@@ -18,7 +18,7 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 1. **Zero Technical/SQL Jargon in Outputs**: The agent must NEVER output raw SQL, table definitions, or database queries in user-facing WhatsApp messages. Responses must be concise, natural, and human-friendly.
 2. **Extreme Brevity**: All WhatsApp replies must be short, clear, and direct (1 to 4 lines maximum).
 3. **Completed Task Deletion Boundary**: The agent has the ability to delete tasks via `deleteCompletedTasks`, but **only** for tasks that have reached `status === 'COMPLETED'`. Ongoing/active tasks cannot be deleted.
-4. **Structured Tools Only**: The agent operates exclusively through 14 typed Prisma & spreadsheet inspection tools.
+4. **Structured & Free Web Tools**: The agent operates through 16 typed Prisma, spreadsheet, and free web inspection tools.
 5. **Deterministic Entity Resolution**: When linking tasks or updating members, exact WhatsApp JID matches (`phone_jid`) take precedence over fuzzy name searches.
 6. **Schema Validation**: All tool inputs are validated via Zod schemas before executing operations.
 
@@ -53,6 +53,12 @@ This contract defines the LLM integration, tool definitions, system prompt rules
 | `listSpreadsheets` | `{ query? }` | `prisma.spreadsheet.findMany()` | Registered sheet[] with columns & rows |
 | `readSpreadsheet` | `{ url?, titleSearch?, spreadsheetId?, query?, limit?, offset?, summaryOnly? }` | Live fetch & CSV parse + cell search/slice | Sheet title, headers, matching rows |
 
+### D. Free Live Internet & Web Tools (`src/agent/tools/web-tools.ts`)
+| Tool | Input Schema | Operation | Returns |
+| :--- | :--- | :--- | :--- |
+| `webSearch` | `{ query, limit? }` | Free DuckDuckGo HTML scraper + Wikipedia fallback | Ranked search results (title, snippet, URL) |
+| `fetchWebPage` | `{ url, maxLength? }` | HTTP fetch + HTML-to-Markdown cleaner | Clean readable markdown text |
+
 ---
 
 ## 4. System Prompt Contract
@@ -61,7 +67,7 @@ The system prompt (`src/agent/prompts.ts`) defines:
 1. **Identity**: The LC Agent, operational assistant and task brain for The Literary Circle Club.
 2. **Response Style**: Ultra-short, compact bullet points, no pleasantries, zero technical/SQL jargon.
 3. **Deletion Rules**: Only tasks with `status === 'COMPLETED'` can be deleted.
-4. **Spreadsheet Knowledge Base**: Able to remember Google Sheets via URLs, inspect rows, search entries, and answer questions.
+4. **Knowledge Retrieval**: Able to search live web data ($0 cost) and inspect Google Sheets via link.
 5. **Domain & Workflow Invariants**: 4 core domains (`web_dev`, `video_editing`, `content_writing`, `graphic_design`) and workflow state machines (`GENERAL`, `POSTER`).
 
 ---
@@ -78,10 +84,11 @@ The system prompt (`src/agent/prompts.ts`) defines:
 
 | File | Responsibility |
 | :--- | :--- |
-| `src/agent/brain.ts` | Core orchestrator: `generateText()` with database & sheet tools |
-| `src/agent/tools/index.ts` | Tool registry exporting all 14 tools |
+| `src/agent/brain.ts` | Core orchestrator: `generateText()` with database, sheet, and web tools |
+| `src/agent/tools/index.ts` | Tool registry exporting all 16 tools |
 | `src/agent/tools/task-tools.ts` | Task CRUD, workflow transitions, and completed task deletion |
 | `src/agent/tools/people-tools.ts` | Member & domain management |
 | `src/agent/tools/sheet-tools.ts` | Google Sheets ingestion, storage, and live querying |
+| `src/agent/tools/web-tools.ts` | Free DuckDuckGo search & webpage content extraction |
 | `src/agent/context.ts` | Sliding-window conversation context manager |
 | `src/agent/prompts.ts` | System prompt enforcing extreme brevity, zero SQL outputs, and deletion safety |

@@ -19,3 +19,7 @@ export {
   listSpreadsheets,
   readSpreadsheet,
 } from './sheet-tools.js'
+export {
+  webSearch,
+  fetchWebPage,
+} from './web-tools.js'

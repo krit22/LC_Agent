@@ -47,13 +47,14 @@ This document describes the high-level architecture, subsystem boundaries, data 
 │  LAYER 4 — Agent Brain (LLM + Tool Calling)                     │
 │  src/agent/brain.ts + tools/*.ts + prompts.ts                    │
 │  • Vercel AI SDK generateText() with OpenRouter provider         │
-│  • 14 Specialized Tools:                                         │
+│  • 16 Specialized Tools:                                         │
 │    - Tasks: listTasks, getTask, createTask, updateTask,          │
 │      deleteCompletedTasks                                        │
 │    - Members: listPeople, getPerson, createPerson, updatePerson │
 │    - Domains: listDomains, createDomain, updateDomain            │
 │    - Spreadsheets: saveSpreadsheet, listSpreadsheets,            │
 │      readSpreadsheet                                             │
+│    - Live Web: webSearch, fetchWebPage ($0 free search)          │
 │  • Multi-step reasoning (stopWhen: isStepCount(5))               │
 │  Output: responseText + tool execution results                   │
 └────────────────────────────────┬─────────────────────────────────┘
